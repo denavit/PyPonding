@@ -4,6 +4,10 @@ import scipy.sparse.linalg
 import matplotlib.pyplot as plt
 from math import hypot,sqrt
 
+import sys
+if(sys.version < '3'):
+    raise Exception('This script requires Python 3')
+
 class Model:
     ndof = 0
     use_sparse_matrix_solver = True
