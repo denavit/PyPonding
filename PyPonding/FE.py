@@ -190,7 +190,7 @@ class Model:
             K_free = scipy.sparse.csc_matrix(K_free)
             inv_K_free = scipy.sparse.linalg.splu(K_free)
         else:
-            inv_K_free = np.linalg.tensorinv(K_free)
+            inv_K_free = np.linalg.inv(K_free)
         
         # Store Analysis Matricies
         self.stored_free_dofs = free_dofs
@@ -211,7 +211,10 @@ class Model:
             f_free[self.stored_dof_map[self.stored_equal_dof_constraints[i]]] += f[i]
         
         # Solve the system of equations
-        d_free = self.stored_inv_K_free.solve(f_free)
+        if self.use_sparse_matrix_solver:
+            d_free = self.stored_inv_K_free.solve(f_free)
+        else:
+            d_free = self.stored_inv_K_free.dot(f_free)
         
         # assemble the entire deformation vector
         d = np.zeros(self.ndof)
