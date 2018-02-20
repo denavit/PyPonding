@@ -14,7 +14,7 @@ class basic_structure:
     def __init__(self):
         pass    
     
-    def Run_To_Strength_Limit(self,start_level=None,max_level=None,incr=1,tol=0.0001,use_sparse=False):
+    def Run_To_Strength_Limit(self,start_level=None,max_level=None,incr=1,tol=0.0001,use_stored=True,use_sparse=False):
     
         if start_level is None:
             start_level = self.lowest_point() + incr
@@ -25,6 +25,10 @@ class basic_structure:
         self.model.use_sparse_matrix_solver = use_sparse
         
         PA = FE.PondingAnalysis(self.model,'Constant_Level')
+        PA.use_stored_analysis = use_stored
+        
+        if use_stored:
+            self.model.StoreAnalysis()
         
         level = start_level
         while (level <= max_level):
