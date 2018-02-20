@@ -14,62 +14,55 @@ class basic_structure:
     def __init__(self):
         pass    
     
-    def Run_To_Strength_Limit(self):
-        datam = self.lowest_point()
-        level = datam + 1
-        max_level = datam + 10
+    def Run_To_Strength_Limit(self,start_level=None,max_level=None,incr=1,tol=0.0001,use_sparse=False):
+    
+        if start_level is None:
+            start_level = self.lowest_point() + incr
+        if max_level is None:
+            max_level = start_level + 10
         
         self.BuildModel();
-        self.model.use_sparse_matrix_solver = True
+        self.model.use_sparse_matrix_solver = use_sparse
         
         PA = FE.PondingAnalysis(self.model,'Constant_Level')
+        
+        level = start_level
         while (level <= max_level):
             res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
             if res != 0:
                 print('Not converged')
             (SR,SR_note) = self.Strength_Ratio(PA)
-            print('Level = %6.3f, Strength Ratio = %8.5f (%s)' % (level,SR,SR_note))
+            print('Level = %7.4f, Strength Ratio = %10.7f (%s)' % (level,SR,SR_note))
+            
             if SR > 1:
+                above_level   = level
+                above_SR      = SR
+                above_SR_note = SR_note
                 break
             else:
-                level = level + 1
+                below_level   = level
+                below_SR      = SR
+                below_SR_note = SR_note
+                level = level + incr
         else:
             print('Maximum water level reached')
     
-        level += -0.9
-        for i in range(10):
+        SR = 0
+        while (abs(SR-1) > tol):
+            level = below_level + (above_level-below_level)*(1-below_SR)/(above_SR-below_SR)
             res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
             if res != 0:
                 print('Not converged')
             (SR,SR_note) = self.Strength_Ratio(PA)
-            print('Level = %6.3f, Strength Ratio = %8.5f (%s)' % (level,SR,SR_note))
+            print('Level = %7.4f, Strength Ratio = %10.7f (%s)' % (level,SR,SR_note))
+            
             if SR > 1:
-                break
+                above_level   = level
+                above_SR      = SR
+                above_SR_note = SR_note
             else:
-                level = level + 0.1
-
-        level += -0.09
-        for i in range(10):
-            res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
-            if res != 0:
-                print('Not converged')
-            (SR,SR_note) = self.Strength_Ratio(PA)
-            print('Level = %6.3f, Strength Ratio = %8.5f (%s)' % (level,SR,SR_note))
-            if SR > 1:
-                break
-            else:
-                level = level + 0.01
-        
-        level += -0.009
-        for i in range(10):
-            res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
-            if res != 0:
-                print('Not converged')
-            (SR,SR_note) = self.Strength_Ratio(PA)
-            print('Level = %6.3f, Strength Ratio = %8.5f (%s)' % (level,SR,SR_note))
-            if SR > 1:
-                break
-            else:
-                level = level + 0.001
+                below_level   = level
+                below_SR      = SR
+                below_SR_note = SR_note           
                 
         #self.plot_results(PA)                
