@@ -66,15 +66,15 @@ class joist(basic_structure.basic_structure):
             ni = 'n%02i' % i
             nj = 'n%02i' % (i+1)
             model.AddElement('e%02i'%i,'ElasticBeam2d',(ni,nj),self.E,self.I,self.A)
-            model.AddPondingLoadCell('p%02i'%i,'2d',(ni,nj),self.LF_P*self.gamma,self.tw)
-            model.PondingLoadCells['p%02i'%i].gammas = self.LF_S1*self.gammas
+            model.AddPondingLoadCell('p%02i'%i,'2d',(ni,nj),self.alpha*self.LF_P*self.gamma,self.tw)
+            model.PondingLoadCells['p%02i'%i].gammas = self.alpha*self.LF_S1*self.gammas
             model.PondingLoadCells['p%02i'%i].hs = self.hs
         
         self.model = model
 
     def Reactions(self,results):
-        Ri = self.model.Nodes['n00'].dofs['UY'].react(results)
-        Rj = self.model.Nodes['n%02i'%self.nele].dofs['UY'].react(results)
+        Ri = self.model.Nodes['n00'].dofs['UY'].react(results)/self.alpha
+        Rj = self.model.Nodes['n%02i'%self.nele].dofs['UY'].react(results)/self.alpha
         return (Ri,Rj)
         
     def Moment_and_Shear(self,results):
@@ -82,7 +82,7 @@ class joist(basic_structure.basic_structure):
         M = np.empty([2*self.nele,1])
         V = np.empty([2*self.nele,1])
         for i in range(self.nele):
-            ele_force = self.model.Elements['e%02i'%i].force(results)
+            ele_force = self.model.Elements['e%02i'%i].force(results)/self.alpha
             x[2*i+0] = i*self.L/self.nele
             x[2*i+1] = (i+1)*self.L/self.nele
             M[2*i+0] = -ele_force.item(2)
@@ -107,7 +107,7 @@ class joist(basic_structure.basic_structure):
             SR_note = 'Reaction at J end'
         
         for i in range(self.nele):
-            ele_force = self.model.Elements['e%02i'%i].force(results)
+            ele_force = self.model.Elements['e%02i'%i].force(results)/self.alpha
                 
             # Moment at I-end
             M = -ele_force.item(2)

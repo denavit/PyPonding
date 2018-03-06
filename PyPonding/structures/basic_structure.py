@@ -2,6 +2,7 @@ from PyPonding import FE
 
 class basic_structure:
     # Loads
+    alpha   = 1
     LF_D    = 1.2 # Dead
     wd      = 10/1000/12**2
     LF_P    = 1.2 # Impounded Water
@@ -32,7 +33,7 @@ class basic_structure:
         
         level = start_level
         while (level <= max_level):
-            res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
+            res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},level)
             if res != 0:
                 print('Not converged')
             (SR,SR_note) = self.Strength_Ratio(PA)
@@ -54,7 +55,7 @@ class basic_structure:
         SR = 0
         while (abs(SR-1) > tol):
             level = below_level + (above_level-below_level)*(1-below_SR)/(above_SR-below_SR)
-            res = PA.run({'DEAD':self.LF_D,'SNOW':self.LF_S2},level)
+            res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},level)
             if res != 0:
                 print('Not converged')
             (SR,SR_note) = self.Strength_Ratio(PA)

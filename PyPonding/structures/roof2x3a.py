@@ -590,8 +590,8 @@ class roof2x3a(roof2x3.roof2x3):
                 nj = 'AB%02i_%02i' % (i+1,  j)
                 nk = 'AB%02i_%02i' % (i+1,j+1)
                 nl = 'AB%02i_%02i' % (  i,j+1)
-                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.LF_P*self.gamma,self.na,self.nb)
-                model.PondingLoadCells[ni].gammas = self.LF_S1*self.gammas
+                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.alpha*self.LF_P*self.gamma,self.na,self.nb)
+                model.PondingLoadCells[ni].gammas = self.alpha*self.LF_S1*self.gammas
                 model.PondingLoadCells[ni].hs = self.hs        
         
         # Define ponding load cells between B and C
@@ -601,8 +601,8 @@ class roof2x3a(roof2x3.roof2x3):
                 nj = 'BC%02i_%02i' % (i+1,  j)
                 nk = 'BC%02i_%02i' % (i+1,j+1)
                 nl = 'BC%02i_%02i' % (  i,j+1)
-                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.LF_P*self.gamma,self.na,self.nb)
-                model.PondingLoadCells[ni].gammas = self.LF_S1*self.gammas
+                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.alpha*self.LF_P*self.gamma,self.na,self.nb)
+                model.PondingLoadCells[ni].gammas = self.alpha*self.LF_S1*self.gammas
                 model.PondingLoadCells[ni].hs = self.hs        
                 
         # Define ponding load cells between C and D
@@ -612,8 +612,8 @@ class roof2x3a(roof2x3.roof2x3):
                 nj = 'CD%02i_%02i' % (i+1,  j)
                 nk = 'CD%02i_%02i' % (i+1,j+1)
                 nl = 'CD%02i_%02i' % (  i,j+1)
-                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.LF_P*self.gamma,self.na,self.nb)                
-                model.PondingLoadCells[ni].gammas = self.LF_S1*self.gammas
+                model.AddPondingLoadCell(ni,'3d',(ni,nj,nk,nl),self.alpha*self.LF_P*self.gamma,self.na,self.nb)                
+                model.PondingLoadCells[ni].gammas = self.alpha*self.LF_S1*self.gammas
                 model.PondingLoadCells[ni].hs = self.hs        
         
         # Define dead and snow load
