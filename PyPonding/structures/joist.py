@@ -20,6 +20,7 @@ class joist(basic_structure.basic_structure):
 
     # Strength properties 
     w   = 277/1000/12
+    shear_reversal_strength = 0.125
     
     # Analysis options
     nele = 20
@@ -130,10 +131,17 @@ class joist(basic_structure.basic_structure):
             # Shear at middle of element
             V = ele_force.item(1)        
             x = (i+0.5)*self.L/self.nele
-            if V >= 0:
-                iV = max(self.w*(self.L/2-x),0.25*iR)
+            if x < 0.5*self.L:
+                if V >= 0:
+                    iV = max(self.w*(self.L/2-x),0.25*iR)
+                else:
+                    iV = -self.shear_reversal_strength*iR
             else:
-                iV = min(self.w*(self.L/2-x),-0.25*iR)
+                if V >= 0:
+                    iV = self.shear_reversal_strength*iR
+                else:
+                    iV = min(self.w*(self.L/2-x),-0.25*iR)            
+            
             if V/iV > SR:
                 SR = V/iV
                 SR_note = 'Shear at x/L = %0.3f' % (x/self.L)
