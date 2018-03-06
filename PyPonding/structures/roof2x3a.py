@@ -731,7 +731,7 @@ class roof2x3a(roof2x3.roof2x3):
         else:
             raise Exception('Unknown column')
             
-        return R
+        return R/self.alpha
         
     def Strength_Ratio(self,results):
         SR = 0
@@ -803,7 +803,7 @@ class roof2x3a(roof2x3.roof2x3):
         #     SR_note = 'Reaction at J end'
         
         for i in range(self.nele_J):
-            ele_force = self.model.Elements['%s_%02i'%(joist,i)].force(results)
+            ele_force = self.model.Elements['%s_%02i'%(joist,i)].force(results)/self.alpha
             
             # Moment at I-end
             M = -ele_force.item(3)
@@ -850,7 +850,7 @@ class roof2x3a(roof2x3.roof2x3):
         iR = self.P_JG*(self.nspaces-1)/2
         
         for i in range(self.nspaces):
-            ele_force = self.model.Elements['%s_%02i'%(Joist_Girder,i)].force(results)
+            ele_force = self.model.Elements['%s_%02i'%(Joist_Girder,i)].force(results)/self.alpha
             
             # Moment at I-end
             M = ele_force.item(4)
