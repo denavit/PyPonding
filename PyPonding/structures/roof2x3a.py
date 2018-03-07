@@ -709,8 +709,21 @@ class roof2x3a(roof2x3.roof2x3):
                         model.Nodes['CD%02i_%02i'%(i,j)].dofs['UZ'].loads['SNOW'] = Pi6S/2
                 else:
                     raise Exception('Should not reach here') 
-                    
-        
+                  
+        # Define Self Weight on Joist Girder
+        Pi1D_JG = -self.wdJG*(self.L_12/self.nspaces)
+        Pi2D_JG = -self.wdJG*(self.L_23/self.nspaces)
+        for i in range(self.nspaces+1):
+            if i == 0 or i == self.nspaces:
+                model.Nodes['B12_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi1D_JG/2
+                model.Nodes['B23_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi2D_JG/2
+                model.Nodes['C12_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi1D_JG/2
+                model.Nodes['C23_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi2D_JG/2
+            else:
+                model.Nodes['B12_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi1D_JG
+                model.Nodes['B23_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi2D_JG
+                model.Nodes['C12_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi1D_JG
+                model.Nodes['C23_%02i'%(i)].dofs['UZ'].loads['DEAD'] = Pi2D_JG
         
         self.model = model
         

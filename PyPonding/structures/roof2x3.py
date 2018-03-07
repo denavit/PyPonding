@@ -44,6 +44,7 @@ class roof2x3(basic_structure.basic_structure):
     c_J     = 1
     c_JG    = 1
     nspaces = 8
+    wdJG    = 0
     
     # Analysis Options
     nele_J  = 20
