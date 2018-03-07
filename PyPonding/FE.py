@@ -639,7 +639,7 @@ class PondingLoadCell2d:
 class PondingLoadCell3d:        
     def __init__(self,id,nodeI,nodeJ,nodeK,nodeL,gamma,na=1,nb=1):
         self.id = id
-        self.nodeI = nodeI
+        self.nodeI = nodeI  # Define nodes counterclockwise
         self.nodeJ = nodeJ
         self.nodeK = nodeK
         self.nodeL = nodeL
@@ -689,44 +689,89 @@ class PondingLoadCell3d:
         # Calculate load
         f = np.zeros((4,1))        
         if self.na == 1 and self.nb == 1:
-            h = np.array([[max(0,hI)],[max(0,hJ)],[max(0,hK)],[max(0,hL)]])
             
+            # Compute pressure due to water and snow at each corner of the cell
+            if self.gammas > 0 and self.hs > 0:
+                if hI <= 0:
+                    wpI = self.gammas*self.hs
+                elif hI <= self.hs:
+                    wpI = max(self.gamma,self.gammas)*hI + self.gammas*(self.hs-hI)
+                else:
+                    wpI = max(self.gamma,self.gammas)*self.hs + self.gamma*(hI-self.hs)
+
+                if hJ <= 0:
+                    wpJ = self.gammas*self.hs
+                elif hJ <= self.hs:
+                    wpJ = max(self.gamma,self.gammas)*hJ + self.gammas*(self.hs-hJ)
+                else:
+                    wpJ = max(self.gamma,self.gammas)*self.hs + self.gamma*(hJ-self.hs)                    
+                    
+                if hK <= 0:
+                    wpK = self.gammas*self.hs
+                elif hK <= self.hs:
+                    wpK = max(self.gamma,self.gammas)*hK + self.gammas*(self.hs-hK)
+                else:
+                    wpK = max(self.gamma,self.gammas)*self.hs + self.gamma*(hK-self.hs)
+
+                if hL <= 0:
+                    wpL = self.gammas*self.hs
+                elif hL <= self.hs:
+                    wpL = max(self.gamma,self.gammas)*hL + self.gammas*(self.hs-hL)
+                else:
+                    wpL = max(self.gamma,self.gammas)*self.hs + self.gamma*(hL-self.hs)                      
+                    
+                wp = np.array([[wpI],[wpJ],[wpK],[wpL]])
+            else:
+                wp = self.gamma*np.array([[max(0,hI)],[max(0,hJ)],[max(0,hK)],[max(0,hL)]])
+            
+            # Compute the force vector
             for iip in range(n_ip):
                 j = self.Jacobian(xi_ip[iip],eta_ip[iip],coords)
                 N = self.ShapeFunction(xi_ip[iip],eta_ip[iip])                
-                f += self.gamma*j*N.dot(np.transpose(N).dot(h))
+                f += j*N.dot(np.transpose(N).dot(-wp))
+                
         else:
             h = np.array([[hI],[hJ],[hK],[hL]])
             
+            # Loop over each sub-cell
             for ia in range(self.na):
                 for ib in range(self.nb):
-                    #print('Sub-cell a = %i b = %i \n' % (ia,ib))
                 
+                    # Define coordinates (in local coordinates) of the corners of the sub-cell
                     xi_sub  = [-1+2*ia/self.na,-1+2*(ia+1)/self.na,-1+2*(ia+1)/self.na,-1+2*ia/self.na]
                     eta_sub = [-1+2*ib/self.nb,-1+2*ib/self.nb,-1+2*(ib+1)/self.nb,-1+2*(ib+1)/self.nb]
                     
-                    #print(xi_sub)
-                    #print(eta_sub)
-                    
-                    # Compute coordinates and height of ponded water in the sub-cell
+                    # Compute for each corner of the sub-cell...
                     coords_sub = np.zeros((4,2))
-                    h_sub = np.zeros((4,1)) 
+                    wp_sub = np.zeros((4,1)) 
                     for i in range(4):
                         N = self.ShapeFunction(xi_sub[i],eta_sub[i])
+                        
+                        # Coordinates (in global coordinates)
                         coords_sub[i,:] = np.transpose(N).dot(coords)
-                        h_sub[i] = max(0,np.transpose(N).dot(h))
+                        
+                        # Height of water at corner of sub-cell
+                        h_sub = np.transpose(N).dot(h)
                     
-                    #print(coords_sub)
-                    #print(h_sub)
+                        # Pressure due to water and snow
+                        if self.gammas > 0 and self.hs > 0:
+                            if h_sub <= 0:
+                                wp_sub[i] = self.gammas*self.hs
+                            elif h_sub <= self.hs:
+                                wp_sub[i] = max(self.gamma,self.gammas)*h_sub + self.gammas*(self.hs-h_sub)
+                            else:
+                                wp_sub[i] = max(self.gamma,self.gammas)*self.hs + self.gamma*(h_sub-self.hs)
+                        else:
+                            wp_sub[i] = self.gamma*max(0,h_sub)
                     
-                    # Compute sub-cell forces
+                    # Compute sub-cell force vector
                     f_sub = np.zeros((4,1)) 
                     for iip in range(n_ip):
                         j = self.Jacobian(xi_ip[iip],eta_ip[iip],coords_sub)
                         N = self.ShapeFunction(xi_ip[iip],eta_ip[iip])                
-                        f_sub += self.gamma*j*N.dot(np.transpose(N).dot(h_sub))
+                        f_sub += j*N.dot(np.transpose(N).dot(-wp_sub))
                     
-                    # Convert sub-cell to cell forces
+                    # Convert sub-cell force vector to cell force vector
                     for i in range(4):
                         N = self.ShapeFunction(xi_sub[i],eta_sub[i])
                         f = f + N*f_sub[i]
