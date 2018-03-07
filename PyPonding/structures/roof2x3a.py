@@ -790,7 +790,30 @@ class roof2x3a(roof2x3.roof2x3):
             SR_note = iSR_note + ' (Joist Girder C23)'        
         
         return (SR,SR_note) 
-    
+
+    def Moment_and_Shear_Joist(self,results,joist):
+        if joist[:2]=='AB':
+            L = self.L_AB
+        elif joist[:2]=='BC':
+            L = self.L_BC
+        elif joist[:2]=='CD':
+            L = self.L_CD          
+        else:
+            raise Exception('Unknown joist: %s'%(joist))
+
+        x = np.empty([2*self.nele_J,1])
+        M = np.empty([2*self.nele_J,1])
+        V = np.empty([2*self.nele_J,1])
+        for i in range(self.nele_J):
+            ele_force = self.model.Elements['%s_%02i'%(joist,i)].force(results)/self.alpha
+            x[2*i+0] = i*L/self.nele_J
+            x[2*i+1] = (i+1)*L/self.nele_J
+            M[2*i+0] = -ele_force.item(3)
+            M[2*i+1] =  ele_force.item(9)
+            V[2*i+0] =  ele_force.item(2)
+            V[2*i+1] = -ele_force.item(8)            
+        return (x,M,V)
+        
     def Strength_Ratio_Joist(self,results,joist):
         SR = 0
         SR_note = ''
@@ -848,6 +871,27 @@ class roof2x3a(roof2x3.roof2x3):
                 SR_note = 'Shear at x/L = %0.3f' % (x/L)
         
         return (SR,SR_note)        
+        
+    def Moment_and_Shear_Joist_Girder(self,results,Joist_Girder):
+        if Joist_Girder == 'B12' or Joist_Girder == 'C12':
+            L = self.L_12
+        elif Joist_Girder == 'B23' or Joist_Girder == 'C23':
+            L = self.L_23
+        else:
+            raise Exception('Unknown Joist Girder: %s'%(Joist_Girder))
+
+        x = np.empty([2*self.nspaces,1])
+        M = np.empty([2*self.nspaces,1])
+        V = np.empty([2*self.nspaces,1])
+        for i in range(self.nspaces):
+            ele_force = self.model.Elements['%s_%02i'%(Joist_Girder,i)].force(results)/self.alpha
+            x[2*i+0] = i*L/self.nspaces
+            x[2*i+1] = (i+1)*L/self.nspaces
+            M[2*i+0] =  ele_force.item(4)
+            M[2*i+1] = -ele_force.item(10)
+            V[2*i+0] =  ele_force.item(2)
+            V[2*i+1] = -ele_force.item(8)            
+        return (x,M,V)        
         
     def Strength_Ratio_Joist_Girder(self,results,Joist_Girder):
         SR = 0
