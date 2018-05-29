@@ -11,6 +11,7 @@ class basic_structure:
     LF_S2   = 0.0 # Snow as Simple Load
     gammas  = 20/1000/12**3
     hs      = 12
+    include_ponding_effect = True
     
     def __init__(self):
         pass    
@@ -25,9 +26,12 @@ class basic_structure:
         self.BuildModel();
         self.model.use_sparse_matrix_solver = use_sparse
         
-        PA = FE.PondingAnalysis(self.model,'Constant_Level')
-        PA.use_stored_analysis = use_stored
+        if self.include_ponding_effect:   
+            PA = FE.PondingAnalysis(self.model,'Constant_Level')
+        else:
+            PA = FE.PondingAnalysis(self.model,'No_Ponding_Effect')
         
+        PA.use_stored_analysis = use_stored
         if use_stored:
             self.model.StoreAnalysis()
         
