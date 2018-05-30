@@ -55,6 +55,7 @@ class basic_structure:
                 level = level + incr
         else:
             print('Maximum water level reached')
+            return float('nan')
     
         SR = 0
         while (abs(SR-1) > tol):
@@ -74,4 +75,4 @@ class basic_structure:
                 below_SR      = SR
                 below_SR_note = SR_note           
                 
-        #self.plot_results(PA)                
+        return level
