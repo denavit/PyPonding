@@ -39,6 +39,7 @@ class roof2x3(basic_structure.basic_structure):
     # Strength properties 
     w_J   = 253/1000/12    
     P_JG  = 7.5
+    joist_shear_reversal_strength = 0.125
     
     # Other Properties
     c_J     = 1

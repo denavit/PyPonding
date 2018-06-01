@@ -816,13 +816,28 @@ class roof2x3b(roof2x3.roof2x3):
             # Shear at middle of element
             V = ele_force.item(2)        
             x = (i+0.5)*L/self.nele_J
-            if V >= 0:
-                iV = max(self.w_J*(L/2-x),0.25*iR)
+            if x < 0.5*L:
+                if V >= 0:
+                    iV = max(self.w_J*(L/2-x),0.25*iR)
+                    if V/iV > SR:
+                        SR = V/iV
+                        SR_note = 'Shear at x/L = %0.3f' % (x/L)
+                else:
+                    iV = -self.shear_reversal_strength*iR
+                    if V/iV > SR:
+                        SR = V/iV
+                        SR_note = 'Shear Reversal at x/L = %0.3f' % (x/L)
             else:
-                iV = min(self.w_J*(L/2-x),-0.25*iR)
-            if V/iV > SR:
-                SR = V/iV
-                SR_note = 'Shear at x/L = %0.3f' % (x/L)
+                if V >= 0:
+                    iV = self.shear_reversal_strength*iR
+                    if V/iV > SR:
+                        SR = V/iV
+                        SR_note = 'Shear Reversal at x/L = %0.3f' % (x/L)
+                else:
+                    iV = min(self.w_J*(L/2-x),-0.25*iR)             
+                    if V/iV > SR:
+                        SR = V/iV
+                        SR_note = 'Shear at x/L = %0.3f' % (x/L)
         
         return (SR,SR_note)        
         
