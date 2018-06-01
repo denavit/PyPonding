@@ -735,17 +735,17 @@ class roof2x3b(roof2x3.roof2x3):
         (iSR,iSR_note) = self.Strength_Ratio_Joist_Girder(results,'AB2')
         if iSR > SR:
             SR = iSR
-            SR_note = iSR_note + ' (Joist Girder B12)'
+            SR_note = iSR_note + ' (Joist Girder AB2)'
         
         (iSR,iSR_note) = self.Strength_Ratio_Joist_Girder(results,'BC2')
         if iSR > SR:
             SR = iSR
-            SR_note = iSR_note + ' (Joist Girder B23)'
+            SR_note = iSR_note + ' (Joist Girder BC2)'
             
         (iSR,iSR_note) = self.Strength_Ratio_Joist_Girder(results,'CD2')
         if iSR > SR:
             SR = iSR
-            SR_note = iSR_note + ' (Joist Girder C12)'                 
+            SR_note = iSR_note + ' (Joist Girder CD2)'                 
         
         return (SR,SR_note) 
     
