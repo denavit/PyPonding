@@ -19,7 +19,7 @@ class basic_structure:
     def Run_To_Strength_Limit(self,start_level=None,max_level=None,incr=1,tol=0.0001,use_stored=True,use_sparse=False):
     
         if start_level is None:
-            start_level = self.lowest_point() + incr
+            start_level = self.lowest_point()
         if max_level is None:
             max_level = start_level + 10
         
