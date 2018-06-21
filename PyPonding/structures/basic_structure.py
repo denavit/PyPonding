@@ -40,6 +40,7 @@ class basic_structure:
             res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},level)
             if res != 0:
                 print('Not converged')
+                return float('nan')
             (SR,SR_note) = self.Strength_Ratio(PA)
             print('Level = %7.4f, Strength Ratio = %10.7f (%s)' % (level,SR,SR_note))
             
@@ -63,6 +64,7 @@ class basic_structure:
             res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},level)
             if res != 0:
                 print('Not converged')
+                return float('nan')
             (SR,SR_note) = self.Strength_Ratio(PA)
             print('Level = %7.4f, Strength Ratio = %10.7f (%s)' % (level,SR,SR_note))
             
