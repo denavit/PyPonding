@@ -5,13 +5,13 @@ from math import pi,pow
 from PyPonding import FE
 from PyPonding.structures import roof2x3
 
-class roof2x3a(roof2x3.roof2x3):
+class roof2x3_Ydir(roof2x3.roof2x3):
 
     def __init__(self):
         pass
         
     def BuildModel(self):
-        model = FE.Model('Roof Example - Type A')
+        model = FE.Model('2 bay by 3 bay roof, joists in Y direction')
         
         # Define Nodes at Column Grids
         model.AddNode('A1',(                0.0,                          0.0,self.z_A1),self.dof_types)
