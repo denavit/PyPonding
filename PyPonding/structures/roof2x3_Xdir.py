@@ -823,13 +823,13 @@ class roof2x3_Xdir(roof2x3.roof2x3):
                         SR = V/iV
                         SR_note = 'Shear at x/L = %0.3f' % (x/L)
                 else:
-                    iV = -self.shear_reversal_strength*iR
+                    iV = -self.joist_shear_reversal_strength*iR
                     if V/iV > SR:
                         SR = V/iV
                         SR_note = 'Shear Reversal at x/L = %0.3f' % (x/L)
             else:
                 if V >= 0:
-                    iV = self.shear_reversal_strength*iR
+                    iV = self.joist_shear_reversal_strength*iR
                     if V/iV > SR:
                         SR = V/iV
                         SR_note = 'Shear Reversal at x/L = %0.3f' % (x/L)
