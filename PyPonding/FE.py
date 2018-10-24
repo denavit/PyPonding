@@ -803,7 +803,7 @@ class PondingLoadCell3d:
         hL = z - (zL + d[self.nodeL.dofs['UZ'].id])
         h = np.array([[hI],[hJ],[hK],[hL]])
         
-        V = self.get_load_vector(d,z).sum()/self.gamma
+        V = -self.get_load_vector(d,z).sum()/self.gamma
         dVdz = 0
         
         for ia in range(self.na):
