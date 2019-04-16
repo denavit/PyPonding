@@ -3,6 +3,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 import matplotlib.pyplot as plt
 from math import hypot,sqrt
+from PyPonding import PondingLoadCell
 
 import sys
 if(sys.version < '3'):
@@ -48,13 +49,13 @@ class Model:
         if type.lower() == '2d':
             nodei = self.Nodes[nodes[0]]
             nodej = self.Nodes[nodes[1]]
-            self.PondingLoadCells[id] = PondingLoadCell2d(id,nodei,nodej,*args)
+            self.PondingLoadCells[id] = PondingLoadCell2d_FE(id,nodei,nodej,*args)
         elif type.lower() == '3d':
             nodei = self.Nodes[nodes[0]]
             nodej = self.Nodes[nodes[1]]
             nodek = self.Nodes[nodes[2]]
             nodel = self.Nodes[nodes[3]]
-            self.PondingLoadCells[id] = PondingLoadCell3d(id,nodei,nodej,nodek,nodel,*args)
+            self.PondingLoadCells[id] = PondingLoadCell3d_FE(id,nodei,nodej,nodek,nodel,*args)
         else:
             raise Exception('Input Error - unknown ponding load cell type (%s)' % type)
             
@@ -84,7 +85,8 @@ class Model:
         # assemble force vector
         f = np.zeros(self.ndof)
         for iCell in self.PondingLoadCells:
-            ipf   = self.PondingLoadCells[iCell].get_load_vector(d,z)
+            self.PondingLoadCells[iCell].update(d)
+            ipf   = self.PondingLoadCells[iCell].get_load_vector(z)
             idofs = self.PondingLoadCells[iCell].get_dof_ids()
             for i in range(len(idofs)):
                 f[idofs[i]] += ipf[i]
@@ -94,7 +96,8 @@ class Model:
         V = 0 
         dVdz = 0
         for iCell in self.PondingLoadCells:
-            ires = self.PondingLoadCells[iCell].get_volume(d,z)
+            self.PondingLoadCells[iCell].update(d)
+            ires = self.PondingLoadCells[iCell].get_volume(z)
             V    += ires[0]
             dVdz += ires[1]
         return (V,dVdz)
@@ -502,152 +505,63 @@ class ElasticBeam3d:
         d_ele = self.disp(results)
         return np.dot(K_ele,d_ele)
         
-class PondingLoadCell2d:        
+class PondingLoadCell2d_FE(PondingLoadCell.PondingLoadCell2d):
     def __init__(self,id,nodeI,nodeJ,gamma,tw):
-        self.id = id
-        self.nodeI = nodeI
-        self.nodeJ = nodeJ
-        self.gamma = gamma
-        self.tw = tw
-        self.gammas = 0
-        self.hs = 0
-    
+        self.id     = id
+        
+        self.nodeI  = nodeI
+        self.xI     = self.nodeI.coords[0]
+        self.yI     = self.nodeI.coords[1]
+
+        self.nodeJ  = nodeJ
+        self.xJ     = self.nodeJ.coords[0]
+        self.yJ     = self.nodeJ.coords[1]
+        
+        self.gamma  = gamma
+        self.tw     = tw
+        
+    def update(self,d):
+        self.dyI = d[self.nodeI.dofs['UY'].id]
+        self.dyJ = d[self.nodeJ.dofs['UY'].id]
+        
     def get_dof_ids(self):
         dofs = [self.nodeI.dofs['UY'].id, 
                 self.nodeJ.dofs['UY'].id]
-        return dofs
+        return dofs        
         
-    def get_load_vector(self,d,z):
-        nIx = self.nodeI.coords[0]
-        nIy = self.nodeI.coords[1]
-        nJx = self.nodeJ.coords[0]
-        nJy = self.nodeJ.coords[1]
-        L  = nJx-nIx;
-        hI = z - (nIy + d[self.nodeI.dofs['UY'].id])
-        hJ = z - (nJy + d[self.nodeJ.dofs['UY'].id])
-        
-        if hI >= 0:
-            if hJ >= 0:
-                F  = -self.gamma*self.tw*(hI+hJ)*L/2
-                x  = L*(2*hJ+hI)/(3*(hI+hJ))
-            else:
-                Lo = (hI)/(hI-hJ)*L
-                F  = -self.gamma*self.tw*hI*Lo/2
-                x  = Lo/3
-        else:
-            if hJ >= 0:
-                Lo = (hJ)/(hJ-hI)*L
-                F  = -self.gamma*self.tw*hJ*Lo/2
-                x  = L-Lo/3
-            else:
-                F = 0
-                x = 0.5*L
-        
-        if self.gammas > 0 and self.hs > 0:
-            # Snow Force      
-            Fs = -self.gammas*self.tw*self.hs*L
-            xs = L/2
-        
-            # Overlap Adjustment Force
-            gammaoa = min(self.gamma,self.gammas)
-            Lxs = (self.hs-hI)*L/(hJ-hI) # length from I-end where the water level crosses the snow level
-            Lxb = -hI*L/(hJ-hI)          # length from I-end where the water level crosses the beam 
-            
-            if hI >= self.hs:
-                if hJ >= self.hs:
-                    Foa = gammaoa*self.tw*self.hs*L
-                    xoa = L/2                
-                elif hJ >= 0:
-                    F1 = gammaoa*self.tw*self.hs*Lxs
-                    x1 = Lxs/2
-                    F2 = gammaoa*self.tw*(self.hs+hJ)*(L-Lxs)/2
-                    x2 = Lxs + (L-Lxs)*(2*hJ+self.hs)/(3*(hJ+self.hs))
-                    Foa = F1 + F2
-                    xoa = (x1*F1 + x2*F2)/Foa
-                else:
-                    F1 = gammaoa*self.tw*self.hs*Lxs
-                    x1 = Lxs/2
-                    F2 = gammaoa*self.tw*(self.hs)*(Lxb-Lxs)/2
-                    x2 = Lxs + (Lxb-Lxs)/3
-                    Foa = F1 + F2
-                    xoa = (x1*F1 + x2*F2)/Foa
-            elif hI >= 0:
-                if hJ >= self.hs:
-                    F1 = gammaoa*self.tw*(hI+self.hs)*(Lxs)/2
-                    x1 = Lxs*(2*self.hs+hI)/(3*(self.hs+hI))
-                    F2 = gammaoa*self.tw*self.hs*(L-Lxs)
-                    x2 = Lxs + (L-Lxs)/2
-                    Foa = F1 + F2
-                    xoa = (x1*F1 + x2*F2)/Foa
-                elif hJ >= 0:
-                    Foa = gammaoa*self.tw*(hI+hJ)*L/2
-                    xoa = L*(2*hJ+hI)/(3*(hJ+hI))
-                else:
-                    Foa = gammaoa*self.tw*hI*Lxb/2
-                    xoa = Lxb/3
-            else:
-                if hJ >= self.hs:
-                    F1 = gammaoa*self.tw*self.hs*(Lxs-Lxb)/2
-                    x1 = Lxs - (Lxs-Lxb)/3
-                    F2 = gammaoa*self.tw*self.hs*(L-Lxs)
-                    x2 = L - (L-Lxs)/2
-                    Foa = F1 + F2
-                    xoa = (x1*F1 + x2*F2)/Foa
-                elif hJ >= 0:
-                    Foa = gammaoa*self.tw*hJ*(L-Lxb)/2
-                    xoa = L - (L-Lxb)/3
-                else:
-                    Foa = 0
-                    xoa = 0
-
-            # Total Force
-            x = (x*F + xs*Fs + xoa*Foa)/(F+Fs+Foa)
-            F = F + Fs + Foa
-            
-        f = np.mat([[(1-x/L)*F],
-                    [  (x/L)*F]])
-        return f
-        
-    def get_volume(self,d,z):       
-        nIx = self.nodeI.coords[0]
-        nIy = self.nodeI.coords[1]
-        nJx = self.nodeJ.coords[0]
-        nJy = self.nodeJ.coords[1]
-        L  = nJx-nIx;
-        hI = z - (nIy + d[self.nodeI.dofs['UY'].id])
-        hJ = z - (nJy + d[self.nodeJ.dofs['UY'].id])
-        if hI >= 0:
-            if hJ >= 0:
-                V    = self.tw*(hI+hJ)*L/2
-                dVdz = self.tw*L
-            else:
-                Lo   = (hI)/(hI-hJ)*L
-                V    = self.tw*hI*Lo/2
-                dVdz = self.tw*Lo
-        else:
-            if hJ >= 0:
-                Lo   = (hJ)/(hJ-hI)*L
-                V    = self.tw*hJ*Lo/2
-                dVdz = self.tw*Lo
-            else:
-                V    = 0
-                dVdz = 0
-        if self.gammas > 0 and self.hs > 0:
-            raise Exception('get_volume not yet implemented for cases with snow')
-        return (V,dVdz)
-        
-class PondingLoadCell3d:        
+class PondingLoadCell3d_FE(PondingLoadCell.PondingLoadCell3d):
     def __init__(self,id,nodeI,nodeJ,nodeK,nodeL,gamma,na=1,nb=1):
-        self.id = id
-        self.nodeI = nodeI  # Define nodes counterclockwise
-        self.nodeJ = nodeJ
-        self.nodeK = nodeK
-        self.nodeL = nodeL
+        self.id     = id
+        
+        self.nodeI  = nodeI  # Define nodes counterclockwise
+        self.xI     = self.nodeI.coords[0]
+        self.yI     = self.nodeI.coords[1]
+        self.zI     = self.nodeI.coords[2]
+        
+        self.nodeJ  = nodeJ
+        self.xJ     = self.nodeJ.coords[0]
+        self.yJ     = self.nodeJ.coords[1]
+        self.zJ     = self.nodeJ.coords[2]
+        
+        self.nodeK  = nodeK
+        self.xK     = self.nodeK.coords[0]
+        self.yK     = self.nodeK.coords[1]
+        self.zK     = self.nodeK.coords[2]
+        
+        self.nodeL  = nodeL
+        self.xL     = self.nodeL.coords[0]
+        self.yL     = self.nodeL.coords[1]
+        self.zL     = self.nodeL.coords[2]
+        
         self.gamma = gamma  # Fluid density
         self.na    = na     # Number of sub-cells along IJ
         self.nb    = nb     # Number of sub-cells along JK
-        self.gammas = 0
-        self.hs = 0        
+        
+    def update(self,d):
+        self.dzI = d[self.nodeI.dofs['UZ'].id]
+        self.dzJ = d[self.nodeJ.dofs['UZ'].id]
+        self.dzK = d[self.nodeK.dofs['UZ'].id]
+        self.dzL = d[self.nodeL.dofs['UZ'].id]
         
     def get_dof_ids(self):
         dofs = [self.nodeI.dofs['UZ'].id, 
@@ -655,223 +569,6 @@ class PondingLoadCell3d:
                 self.nodeK.dofs['UZ'].id, 
                 self.nodeL.dofs['UZ'].id]
         return dofs
-        
-    def get_load_vector(self,d,z):
-        xI = self.nodeI.coords[0]
-        yI = self.nodeI.coords[1]
-        zI = self.nodeI.coords[2]
-        xJ = self.nodeJ.coords[0]
-        yJ = self.nodeJ.coords[1]
-        zJ = self.nodeJ.coords[2]
-        xK = self.nodeK.coords[0]
-        yK = self.nodeK.coords[1]
-        zK = self.nodeK.coords[2]
-        xL = self.nodeL.coords[0]
-        yL = self.nodeL.coords[1]
-        zL = self.nodeL.coords[2]
-
-        coords = np.mat([[xI,yI],
-                         [xJ,yJ],
-                         [xK,yK],
-                         [xL,yL]])
-        
-        hI = z - (zI + d[self.nodeI.dofs['UZ'].id])
-        hJ = z - (zJ + d[self.nodeJ.dofs['UZ'].id])
-        hK = z - (zK + d[self.nodeK.dofs['UZ'].id])
-        hL = z - (zL + d[self.nodeL.dofs['UZ'].id])
-        
-        # Define numerical integration points and weights
-        n_ip   = 4
-        xi_ip  = [-1/sqrt(3), 1/sqrt(3), 1/sqrt(3),-1/sqrt(3)] 
-        eta_ip = [-1/sqrt(3),-1/sqrt(3), 1/sqrt(3), 1/sqrt(3)] 
-        w_ip   = [ 1, 1, 1, 1]        
-
-        # Calculate load
-        f = np.zeros((4,1))        
-        if self.na == 1 and self.nb == 1:
-            
-            # Compute pressure due to water and snow at each corner of the cell
-            if self.gammas > 0 and self.hs > 0:
-                if hI <= 0:
-                    wpI = self.gammas*self.hs
-                elif hI <= self.hs:
-                    wpI = max(self.gamma,self.gammas)*hI + self.gammas*(self.hs-hI)
-                else:
-                    wpI = max(self.gamma,self.gammas)*self.hs + self.gamma*(hI-self.hs)
-
-                if hJ <= 0:
-                    wpJ = self.gammas*self.hs
-                elif hJ <= self.hs:
-                    wpJ = max(self.gamma,self.gammas)*hJ + self.gammas*(self.hs-hJ)
-                else:
-                    wpJ = max(self.gamma,self.gammas)*self.hs + self.gamma*(hJ-self.hs)                    
-                    
-                if hK <= 0:
-                    wpK = self.gammas*self.hs
-                elif hK <= self.hs:
-                    wpK = max(self.gamma,self.gammas)*hK + self.gammas*(self.hs-hK)
-                else:
-                    wpK = max(self.gamma,self.gammas)*self.hs + self.gamma*(hK-self.hs)
-
-                if hL <= 0:
-                    wpL = self.gammas*self.hs
-                elif hL <= self.hs:
-                    wpL = max(self.gamma,self.gammas)*hL + self.gammas*(self.hs-hL)
-                else:
-                    wpL = max(self.gamma,self.gammas)*self.hs + self.gamma*(hL-self.hs)                      
-                    
-                wp = np.array([[wpI],[wpJ],[wpK],[wpL]])
-            else:
-                wp = self.gamma*np.array([[max(0,hI)],[max(0,hJ)],[max(0,hK)],[max(0,hL)]])
-            
-            # Compute the force vector
-            for iip in range(n_ip):
-                j = self.Jacobian(xi_ip[iip],eta_ip[iip],coords)
-                N = self.ShapeFunction(xi_ip[iip],eta_ip[iip])                
-                f += j*N.dot(np.transpose(N).dot(-wp))
-                
-        else:
-            h = np.array([[hI],[hJ],[hK],[hL]])
-            
-            # Loop over each sub-cell
-            for ia in range(self.na):
-                for ib in range(self.nb):
-                
-                    # Define coordinates (in local coordinates) of the corners of the sub-cell
-                    xi_sub  = [-1+2*ia/self.na,-1+2*(ia+1)/self.na,-1+2*(ia+1)/self.na,-1+2*ia/self.na]
-                    eta_sub = [-1+2*ib/self.nb,-1+2*ib/self.nb,-1+2*(ib+1)/self.nb,-1+2*(ib+1)/self.nb]
-                    
-                    # Compute for each corner of the sub-cell...
-                    coords_sub = np.zeros((4,2))
-                    wp_sub = np.zeros((4,1)) 
-                    for i in range(4):
-                        N = self.ShapeFunction(xi_sub[i],eta_sub[i])
-                        
-                        # Coordinates (in global coordinates)
-                        coords_sub[i,:] = np.transpose(N).dot(coords)
-                        
-                        # Height of water at corner of sub-cell
-                        h_sub = np.transpose(N).dot(h)
-                    
-                        # Pressure due to water and snow
-                        if self.gammas > 0 and self.hs > 0:
-                            if h_sub <= 0:
-                                wp_sub[i] = self.gammas*self.hs
-                            elif h_sub <= self.hs:
-                                wp_sub[i] = max(self.gamma,self.gammas)*h_sub + self.gammas*(self.hs-h_sub)
-                            else:
-                                wp_sub[i] = max(self.gamma,self.gammas)*self.hs + self.gamma*(h_sub-self.hs)
-                        else:
-                            wp_sub[i] = self.gamma*max(0,h_sub)
-                    
-                    # Compute sub-cell force vector
-                    f_sub = np.zeros((4,1)) 
-                    for iip in range(n_ip):
-                        j = self.Jacobian(xi_ip[iip],eta_ip[iip],coords_sub)
-                        N = self.ShapeFunction(xi_ip[iip],eta_ip[iip])                
-                        f_sub += j*N.dot(np.transpose(N).dot(-wp_sub))
-                    
-                    # Convert sub-cell force vector to cell force vector
-                    for i in range(4):
-                        N = self.ShapeFunction(xi_sub[i],eta_sub[i])
-                        f = f + N*f_sub[i]
-        return f        
-        
-        
-    def get_volume(self,d,z):       
-        xI = self.nodeI.coords[0]
-        yI = self.nodeI.coords[1]
-        zI = self.nodeI.coords[2]
-        xJ = self.nodeJ.coords[0]
-        yJ = self.nodeJ.coords[1]
-        zJ = self.nodeJ.coords[2]
-        xK = self.nodeK.coords[0]
-        yK = self.nodeK.coords[1]
-        zK = self.nodeK.coords[2]
-        xL = self.nodeL.coords[0]
-        yL = self.nodeL.coords[1]
-        zL = self.nodeL.coords[2]
-        
-        coords = np.mat([[xI,yI],
-                         [xJ,yJ],
-                         [xK,yK],
-                         [xL,yL]])        
-        
-        hI = z - (zI + d[self.nodeI.dofs['UZ'].id])
-        hJ = z - (zJ + d[self.nodeJ.dofs['UZ'].id])
-        hK = z - (zK + d[self.nodeK.dofs['UZ'].id])
-        hL = z - (zL + d[self.nodeL.dofs['UZ'].id])
-        h = np.array([[hI],[hJ],[hK],[hL]])
-        
-        V = -self.get_load_vector(d,z).sum()/self.gamma
-        dVdz = 0
-        
-        for ia in range(self.na):
-            for ib in range(self.nb):        
-                xi_sub  = [-1+2*ia/self.na,-1+2*(ia+1)/self.na,-1+2*(ia+1)/self.na,-1+2*ia/self.na]
-                eta_sub = [-1+2*ib/self.nb,-1+2*ib/self.nb,-1+2*(ib+1)/self.nb,-1+2*(ib+1)/self.nb]
-                
-                # Compute coordinates and height of ponded water in the sub-cell
-                coords_sub = np.zeros((4,2))
-                h_sub = np.zeros((4,1)) 
-                for i in range(4):
-                    N = self.ShapeFunction(xi_sub[i],eta_sub[i])
-                    coords_sub[i,:] = np.transpose(N).dot(coords)
-                    h_sub[i] = np.transpose(N).dot(h)
-                                               
-                # Determine pologon where h > 0
-                x_coord = np.empty(0)
-                y_coord = np.empty(0)
-                if h_sub[0] >= 0:
-                    x_coord = np.append(x_coord,coords_sub[0,0])
-                    y_coord = np.append(y_coord,coords_sub[0,1])
-                if (h_sub[0] > 0 and h_sub[1] < 0) or (h_sub[0] < 0 and h_sub[1] > 0):
-                    a = h_sub[0]/(h_sub[0]-h_sub[1])
-                    x_coord = np.append(x_coord,coords_sub[0,0]+a*(coords_sub[1,0]-coords_sub[0,0]))
-                    y_coord = np.append(y_coord,coords_sub[0,1]+a*(coords_sub[1,1]-coords_sub[0,1]))
-                if h_sub[1] >= 0:
-                    x_coord = np.append(x_coord,coords_sub[1,0])
-                    y_coord = np.append(y_coord,coords_sub[1,1])
-                if (h_sub[1] > 0 and h_sub[2] < 0) or (h_sub[1] < 0 and h_sub[2] > 0):
-                    a = h_sub[1]/(h_sub[1]-h_sub[2])
-                    x_coord = np.append(x_coord,coords_sub[1,0]+a*(coords_sub[2,0]-coords_sub[1,0]))
-                    y_coord = np.append(y_coord,coords_sub[1,1]+a*(coords_sub[2,1]-coords_sub[1,1]))                 
-                if h_sub[2] >= 0:
-                    x_coord = np.append(x_coord,coords_sub[2,0])
-                    y_coord = np.append(y_coord,coords_sub[2,1])
-                if (h_sub[2] > 0 and h_sub[3] < 0) or (h_sub[2] < 0 and h_sub[3] > 0):
-                    a = h_sub[2]/(h_sub[2]-h_sub[3])
-                    x_coord = np.append(x_coord,coords_sub[2,0]+a*(coords_sub[3,0]-coords_sub[2,0]))
-                    y_coord = np.append(y_coord,coords_sub[2,1]+a*(coords_sub[3,1]-coords_sub[2,1]))
-                if h_sub[3] >= 0:
-                    x_coord = np.append(x_coord,coords_sub[3,0])
-                    y_coord = np.append(y_coord,coords_sub[3,1])
-                if (h_sub[3] > 0 and h_sub[0] < 0) or (h_sub[3] < 0 and h_sub[0] > 0):
-                    a = h_sub[3]/(h_sub[3]-h_sub[0])
-                    x_coord = np.append(x_coord,coords_sub[3,0]+a*(coords_sub[0,0]-coords_sub[3,0]))
-                    y_coord = np.append(y_coord,coords_sub[3,1]+a*(coords_sub[0,1]-coords_sub[3,1]))               
-                
-                # Compute area of polygon and add it to dVdz
-                if x_coord.size > 0:
-                    dVdz += 0.5*np.abs(np.dot(x_coord,np.roll(y_coord,1))-np.dot(y_coord,np.roll(x_coord,1)))
-                
-        return (V,dVdz)        
-
-    @staticmethod
-    def ShapeFunction(xi,eta):
-        N = np.array([[(1-xi)*(1-eta)],
-                      [(1+xi)*(1-eta)],
-                      [(1+xi)*(1+eta)],
-                      [(1-xi)*(1+eta)]])/4
-        return N
-        
-    @staticmethod    
-    def Jacobian(xi,eta,coords):
-        dNd_ = np.array([[-(1-eta), (1-eta), (1+eta),-(1+eta)],
-                         [ -(1-xi), -(1+xi),  (1+xi),  (1-xi)]])/4
-        jac = np.dot(dNd_,coords)
-        j   = np.linalg.det(jac)
-        return j
         
 class LinearAnalysis:
 
