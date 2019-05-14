@@ -65,33 +65,56 @@ class wf:
             #ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, 0.001*E)
         else:
             raise Exception('Input Error - unknown material type (%s)' % self.material_type)
-        ops.section('Fiber', secTag)
-        numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        ops.patch('rect', matTag, numSubdivY, 1, self.dw()/2, -self.bf/2, self.d/2, self.bf/2)
-        numSubdivY = ceil(self.dw()*(self.num_fiber/self.d))
-        ops.patch('rect', matTag, numSubdivY, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
-        numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        ops.patch('rect', matTag, numSubdivY, 1, -self.d/2, -self.bf/2, -self.dw()/2, self.bf/2)
+        #ops.section('Fiber', secTag)
+        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
+        #ops.patch('rect', matTag, numSubdivY, 1, self.dw()/2, -self.bf/2, self.d/2, self.bf/2)
+        #numSubdivY = ceil(self.dw()*(self.num_fiber/self.d))
+        #ops.patch('rect', matTag, numSubdivY, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
+        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
+        #ops.patch('rect', matTag, numSubdivY, 1, -self.d/2, -self.bf/2, -self.dw()/2, self.bf/2)
+        ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,20,4)
         return
   
 
 nsteps = 100
-data_volume = np.zeros((nsteps+1,2))
-data_height = np.zeros((nsteps+1,2))
-end_step = [nsteps, nsteps]
 
 # Number of Monte Carlo trials
-Ntrials = 10
+Ntrials = 200
 
-material_types = ['Elastic','ElasticPP']
-  
-# input parameters
-for iAnalysis in range(1):
+material_type = 'Elastic'
+material_type = 'ElasticPP'
 
-    E = 29000.0
-    Fy = 50.0
-    wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
-    wf_section.material_type = material_types[iAnalysis]
+# Number of failed MC trials
+Nfailed = 0
+
+Fy = 50.0
+E = 29000.0
+
+# W6x15
+d = 5.99
+tweb = 0.230
+bf = 5.99
+tf = 0.260
+
+ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
+ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E)
+ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
+ops.randomVariable(4,'normal','-mean',tweb,'-stdv',0.02*tweb)
+ops.randomVariable(5,'normal','-mean',bf,'-stdv',0.02*bf)
+ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
+
+ops.probabilityTransformation('Nataf')
+
+Nrv = len(ops.getRVTags())
+u = np.zeros(Nrv)
+
+for j in range(Ntrials):
+
+    ops.reset()
+
+    #wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
+    wf_section = wf(d,tweb,bf,tf,Fy,E) # W6x15
+    wf_section.material_type = material_type
     # print(wf_section.A()) # 4.43 from the Steel Manual
     # print(wf_section.Iz()) # 29.1 from the Steel Manual
 
@@ -111,8 +134,9 @@ for iAnalysis in range(1):
     mid_node = int(nele/2)
 
     # set modelbuilder
+    ops.wipe()
     ops.model('basic', '-ndm', 2, '-ndf', 3)
-
+    
     # create nodes
     for i in range(nele+1):
         ops.node(i,L*i/(nele),zi+(zj-zi)*i/(nele))
@@ -126,15 +150,16 @@ for iAnalysis in range(1):
 
     # define cross section
     wf_section.define_fiber_section(1,1)
-    #ops.beamIntegration('Lobatto', 1, 1, 3)
-    ops.beamIntegration('Legendre', 1, 1, 2)    
-
-    ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
-    ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E)    
+    ops.beamIntegration('Lobatto', 1, 1, 3)
+    #ops.beamIntegration('Legendre', 1, 1, 2)    
 
     ops.parameter(1)
     ops.parameter(2)
-    
+    ops.parameter(3)
+    ops.parameter(4)
+    ops.parameter(5)
+    ops.parameter(6)
+
     # define elements
     for i in range(0,nele):
         # ops.element("elasticBeamColumn",i,i,i+1,A,E,Iz,1)
@@ -142,9 +167,17 @@ for iAnalysis in range(1):
         #ops.element("dispBeamColumn",i,i,i+1,1,1)
         ops.addToParameter(1,'element',i,'fy')
         ops.addToParameter(2,'element',i,'E')
+        ops.addToParameter(3,'element',i,'d')
+        ops.addToParameter(4,'element',i,'tw')
+        ops.addToParameter(5,'element',i,'bf')
+        ops.addToParameter(6,'element',i,'tf')        
+
+    # define ponding load cells    
+    PondingLoadCells = dict()
+    for i in range(nele):
+        PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
 
-        
     # ------------------------------
     # Start of analysis generation
     # ------------------------------
@@ -157,143 +190,135 @@ for iAnalysis in range(1):
 
     # create constraint handler
     ops.constraints("Plain")
-
+    
     # create integrator
     ops.integrator("LoadControl", 1.0)
-
+    
     # create algorithm
-    ops.algorithm("Newton")
-
+    ops.algorithm("Linear")
+    
     ops.probabilityTransformation('Nataf')
     
     # create analysis object
     ops.analysis("Static")
 
-    # Number of failed MC trials
-    Nfailed = 0
-    
-    Nrv = len(ops.getRVTags())
-    u = np.zeros(Nrv)
-    
-    for j in range(Ntrials):
+    # Transform random variables from standard normal to actual space
+    # 1. Create random values in standard normal space
+    jj = 0
+    for rv in ops.getRVTags():
+        u[jj] = norm.ppf(np.random.rand())
+        #u[jj] = 0.0
+        jj = jj+1
 
-        ops.reset()
+    # 2. Transform to real space
+    x = ops.transformUtoX(*u)
+    print(j,x)
+    # 3. Update parameters with random realizations
+    jj = 0
+    for rv in ops.getRVTags():
+        ops.updateParameter(rv,x[jj])
+        jj = jj+1
 
-        # Transform random variables from standard normal to actual space
-        # 1. Create random values in standard normal space
-        jj = 0
-        for rv in ops.getRVTags():
-            u[jj] = norm.ppf(np.random.rand())
-            jj = jj+1
-
-        # 2. Transform to real space
-        x = ops.transformUtoX(*u)
-        print(j,x)
-        # 3. Update parameters with random realizations
-        jj = 0
-        for rv in ops.getRVTags():
-            ops.updateParameter(rv,x[jj])
-            jj = jj+1
-
-
-            
-        # define ponding load cells    
-        PondingLoadCells = dict()
-        for i in range(0,nele):
-            PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
-            
-        # ------------------------------
-        # Finally perform the analysis
-        # ------------------------------
-
-        # Create dict of each node that can have ponding load applied and initilize load to zero
-        EmptyPondingLoad = dict()
-        for iCell in PondingLoadCells:
-            if not PondingLoadCells[iCell].nodeI in EmptyPondingLoad:
-                EmptyPondingLoad[PondingLoadCells[iCell].nodeI] = 0.0    
-            if not PondingLoadCells[iCell].nodeJ in EmptyPondingLoad:
-                EmptyPondingLoad[PondingLoadCells[iCell].nodeJ] = 0.0
-
-
-            
-        # Perform analysis, ramping up volume      
-        zw = 0.1
-        CurrentPondingLoad = EmptyPondingLoad.copy()
-        for iStep in range(0,nsteps):
-
-            target_volume = (iStep+1)/nsteps*max_volume
-
-            # Update ponding load cells
-            for iCell in PondingLoadCells:
-                PondingLoadCells[iCell].update()
-
-            # Estimate water height
-            for i in range(nsteps_vol):
-                V = 0
-                dVdz = 0
-                for iCell in PondingLoadCells:
-                    (iV,idVdz) = PondingLoadCells[iCell].get_volume(zw)
-                    V += iV
-                    dVdz += idVdz
-                    zw = zw - (V-target_volume)/dVdz
-                if abs(target_volume-V) <= vol_tol:
-                    break 
-
-            # Compute load vector
-            UpdatedPondingLoad = EmptyPondingLoad.copy()
-            for iCell in PondingLoadCells:    
-                f = PondingLoadCells[iCell].get_load_vector(zw)
-                UpdatedPondingLoad[PondingLoadCells[iCell].nodeI] += f.item(0)
-                UpdatedPondingLoad[PondingLoadCells[iCell].nodeJ] += f.item(1)
-
-            # Apply difference to model
-            #
-            # Remove time series and pattern so there's not
-            # duplicate tag errors in MC loop
-            ops.remove('timeSeries',iStep)
-            ops.remove('pattern',iStep)
-            ops.timeSeries("Linear", iStep)
-            ops.pattern("Plain", iStep, iStep)
-            for iNode in UpdatedPondingLoad:        
-                fy = UpdatedPondingLoad[iNode] - CurrentPondingLoad[iNode]
-                ops.load(iNode, 0.0, fy, 0.0)
-                CurrentPondingLoad = UpdatedPondingLoad
-
-            # Run analysis
-            ops.analyze(1)
-            ops.loadConst('-time',0.0)
-
-            # Store Data
-            data_volume[iStep+1,iAnalysis] = target_volume
-            data_height[iStep+1,iAnalysis] = zw
-
-            # Stop analysis if water level too low
-            if zw <= -1:
-                end_step[iAnalysis] = iStep+1
-                break        
         
-    # Wipe Analysis
-    ops.wipe()
 
 
 
 
-    
-#wi = gamma*zw*tw
-#deltai = -5*wi*L**4/(384*E*Iz)
-#C = gamma*tw*L**4/(pi**4*E*Iz)
-#delta  = deltai/(5*pi**4*C/192/(1/(cos(pi/2*C**0.25))+1/(cosh(pi/2*C**0.25))-2))
-#    
-#uy = nodeDisp(mid_node,2)
-#print('Ponding Amplification: %.3f' % (delta/deltai))    
-#print('Closed-form: %.5f' % delta)    
-#print('OpenSees:    %.5f' % uy)
-#print('Percent Diff %.2f%%' % (100*(uy-delta)/delta))
 
-# Show plot
-plt.plot(data_volume[:end_step[0]+1,0], data_height[:end_step[0]+1,0])
-plt.plot(data_volume[:end_step[1]+1,1], data_height[:end_step[1]+1,1])
+
+    # ------------------------------
+    # Finally perform the analysis
+    # ------------------------------
+
+    # Create dict of each node that can have ponding load applied and initilize load to zero
+    EmptyPondingLoad = dict()
+    for iCell in PondingLoadCells:
+        if not PondingLoadCells[iCell].nodeI in EmptyPondingLoad:
+            EmptyPondingLoad[PondingLoadCells[iCell].nodeI] = 0.0    
+        if not PondingLoadCells[iCell].nodeJ in EmptyPondingLoad:
+            EmptyPondingLoad[PondingLoadCells[iCell].nodeJ] = 0.0
+        
+    data_volume = np.zeros(nsteps+1)
+    data_height = np.zeros(nsteps+1)
+    end_step = nsteps
+
+    # Perform analysis, ramping up volume      
+    zw = 0.1
+    CurrentPondingLoad = EmptyPondingLoad.copy()
+    for iStep in range(nsteps):
+
+        target_volume = (iStep+1)/nsteps*max_volume
+
+        # Update ponding load cells
+        for iCell in PondingLoadCells:
+            PondingLoadCells[iCell].update()
+
+        # Estimate water height
+        for i in range(nsteps_vol):
+            V = 0
+            dVdz = 0
+            for iCell in PondingLoadCells:
+                (iV,idVdz) = PondingLoadCells[iCell].get_volume(zw)
+                V += iV
+                dVdz += idVdz
+            zw = zw - (V-target_volume)/dVdz
+            if abs(target_volume-V) <= vol_tol:
+                break 
+
+        # Compute load vector
+        UpdatedPondingLoad = EmptyPondingLoad.copy()
+        for iCell in PondingLoadCells:    
+            f = PondingLoadCells[iCell].get_load_vector(zw)
+            UpdatedPondingLoad[PondingLoadCells[iCell].nodeI] += f.item(0)
+            UpdatedPondingLoad[PondingLoadCells[iCell].nodeJ] += f.item(1)
+
+        # Apply difference to model
+        #
+        # Remove time series and pattern so there's not
+        # duplicate tag errors in MC loop
+        ops.remove('timeSeries',iStep)
+        ops.remove('loadPattern',iStep)
+        ops.timeSeries("Linear", iStep)
+        ops.pattern("Plain", iStep, iStep)
+        for iNode in UpdatedPondingLoad:
+            fy = UpdatedPondingLoad[iNode] - CurrentPondingLoad[iNode]
+            ops.load(iNode, 0.0, fy, 0.0)
+        CurrentPondingLoad = UpdatedPondingLoad
+
+        # Run analysis
+        ops.analyze(1)
+        #ops.reactions()
+        ops.loadConst('-time',0.0)
+        #for i in range(nele+1):
+        #    print(ops.nodeDisp(i,2))
+
+
+        # Store Data
+        data_volume[iStep+1] = target_volume
+        data_height[iStep+1] = zw
+        
+        # Stop analysis if water level too low
+        if zw <= -1:
+            end_step = iStep+1
+            break        
+
+    #wi = gamma*zw*tw
+    #deltai = -5*wi*L**4/(384*E*Iz)
+    #C = gamma*tw*L**4/(pi**4*E*Iz)
+    #delta  = deltai/(5*pi**4*C/192/(1/(cos(pi/2*C**0.25))+1/(cosh(pi/2*C**0.25))-2))
+    #    
+    #uy = nodeDisp(mid_node,2)
+    #print('Ponding Amplification: %.3f' % (delta/deltai))    
+    #print('Closed-form: %.5f' % delta)    
+    #print('OpenSees:    %.5f' % uy)
+    #print('Percent Diff %.2f%%' % (100*(uy-delta)/delta))
+
+    # Show plot
+    plt.plot(data_volume[:end_step+1], data_height[:end_step+1])
+    #plt.plot(data_volume, data_height)
+
 plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
+plt.ylim([-10,5])
 plt.show()
 
