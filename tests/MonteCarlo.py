@@ -72,20 +72,17 @@ class wf:
         #ops.patch('rect', matTag, numSubdivY, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
         #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
         #ops.patch('rect', matTag, numSubdivY, 1, -self.d/2, -self.bf/2, -self.dw()/2, self.bf/2)
-        ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,20,4)
+        
+        Nfw = ceil(self.dw()*(self.num_fiber/self.d))
+        Nff = ceil(self.tf*(self.num_fiber/self.d))
+        ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,Nfw,Nff)
         return
   
 
 nsteps = 100
 
-# Number of Monte Carlo trials
-Ntrials = 200
-
 material_type = 'Elastic'
 material_type = 'ElasticPP'
-
-# Number of failed MC trials
-Nfailed = 0
 
 Fy = 50.0
 E = 29000.0
@@ -96,6 +93,47 @@ tweb = 0.230
 bf = 5.99
 tf = 0.260
 
+#wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
+wf_section = wf(d,tweb,bf,tf,Fy,E) # W6x15
+wf_section.material_type = material_type
+# print(wf_section.A()) # 4.43 from the Steel Manual
+# print(wf_section.Iz()) # 29.1 from the Steel Manual
+
+L       = 480.0
+A       = wf_section.A()
+Iz      = wf_section.Iz()
+gamma   = 62.4/1000/12**3
+tw      = 60.0
+zi      = 0.0
+zj      = 10.0
+
+max_volume = 10*L*tw
+
+nsteps_vol = 30
+nele = 20
+vol_tol = max_volume/nsteps/100
+mid_node = int(nele/2)
+
+# set modelbuilder
+ops.wipe()
+ops.model('basic', '-ndm', 2, '-ndf', 3)
+    
+# create nodes
+for i in range(nele+1):
+    ops.node(i,L*i/(nele),zi+(zj-zi)*i/(nele))
+
+# set boundary condition
+ops.fix(   0, 1, 1, 0)
+ops.fix(nele, 0, 1, 0)
+
+# define coordinate transformation
+ops.geomTransf('Linear',1)
+
+# define cross section
+wf_section.define_fiber_section(1,1)
+ops.beamIntegration('Lobatto', 1, 1, 3)
+#ops.beamIntegration('Legendre', 1, 1, 2)    
+
 ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
 ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E)
 ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
@@ -105,114 +143,90 @@ ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
 
 ops.probabilityTransformation('Nataf')
 
+ops.parameter(1)
+ops.parameter(2)
+ops.parameter(3)
+ops.parameter(4)
+ops.parameter(5)
+ops.parameter(6)
+
+# define elements
+for i in range(nele):
+    # ops.element("elasticBeamColumn",i,i,i+1,A,E,Iz,1)
+    ops.element("forceBeamColumn",i,i,i+1,1,1)
+    #ops.element("dispBeamColumn",i,i,i+1,1,1)
+    ops.addToParameter(1,'element',i,'fy')
+    ops.addToParameter(2,'element',i,'E')
+    ops.addToParameter(3,'element',i,'d')
+    ops.addToParameter(4,'element',i,'tw')
+    ops.addToParameter(5,'element',i,'bf')
+    ops.addToParameter(6,'element',i,'tf')        
+
+# define ponding load cells    
+PondingLoadCells = dict()
+for i in range(nele):
+    PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
+
+
+
+# ------------------------------
+# Start of analysis generation
+# ------------------------------
+
+# create SOE
+ops.system("BandSPD")
+
+# create DOF number
+ops.numberer("RCM")
+
+# create constraint handler
+ops.constraints("Plain")
+    
+# create integrator
+ops.integrator("LoadControl", 0.0)
+    
+# create algorithm
+ops.algorithm("Newton")
+    
+ops.probabilityTransformation('Nataf')
+    
+# create analysis object
+ops.analysis("Static")
+
+# Time series for loads
+ops.timeSeries("Constant", 1)
+
+
 Nrv = len(ops.getRVTags())
 u = np.zeros(Nrv)
+
+# Number of Monte Carlo trials
+Ntrials = 100
+#Ntrials = 2
+
+# Number of failed MC trials
+Nfailed = 0
+
+# Max water height above hFail is failure
+hFail = 4.0
+
+
 
 for j in range(Ntrials):
 
     ops.reset()
-
-    #wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
-    wf_section = wf(d,tweb,bf,tf,Fy,E) # W6x15
-    wf_section.material_type = material_type
-    # print(wf_section.A()) # 4.43 from the Steel Manual
-    # print(wf_section.Iz()) # 29.1 from the Steel Manual
-
-    L       = 480.0
-    A       = wf_section.A()
-    Iz      = wf_section.Iz()
-    gamma   = 62.4/1000/12**3
-    tw      = 60.0
-    zi      = 0.0
-    zj      = 10.0
-
-    max_volume = 10*L*tw
-
-    nsteps_vol = 30
-    nele = 20
-    vol_tol = max_volume/nsteps/100
-    mid_node = int(nele/2)
-
-    # set modelbuilder
-    ops.wipe()
-    ops.model('basic', '-ndm', 2, '-ndf', 3)
-    
-    # create nodes
-    for i in range(nele+1):
-        ops.node(i,L*i/(nele),zi+(zj-zi)*i/(nele))
-
-    # set boundary condition
-    ops.fix(   0, 1, 1, 0)
-    ops.fix(nele, 0, 1, 0)
-
-    # define coordinate transformation
-    ops.geomTransf('Linear',1)
-
-    # define cross section
-    wf_section.define_fiber_section(1,1)
-    ops.beamIntegration('Lobatto', 1, 1, 3)
-    #ops.beamIntegration('Legendre', 1, 1, 2)    
-
-    ops.parameter(1)
-    ops.parameter(2)
-    ops.parameter(3)
-    ops.parameter(4)
-    ops.parameter(5)
-    ops.parameter(6)
-
-    # define elements
-    for i in range(0,nele):
-        # ops.element("elasticBeamColumn",i,i,i+1,A,E,Iz,1)
-        ops.element("forceBeamColumn",i,i,i+1,1,1)
-        #ops.element("dispBeamColumn",i,i,i+1,1,1)
-        ops.addToParameter(1,'element',i,'fy')
-        ops.addToParameter(2,'element',i,'E')
-        ops.addToParameter(3,'element',i,'d')
-        ops.addToParameter(4,'element',i,'tw')
-        ops.addToParameter(5,'element',i,'bf')
-        ops.addToParameter(6,'element',i,'tf')        
-
-    # define ponding load cells    
-    PondingLoadCells = dict()
-    for i in range(nele):
-        PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
-
-
-    # ------------------------------
-    # Start of analysis generation
-    # ------------------------------
-
-    # create SOE
-    ops.system("BandSPD")
-
-    # create DOF number
-    ops.numberer("RCM")
-
-    # create constraint handler
-    ops.constraints("Plain")
-    
-    # create integrator
-    ops.integrator("LoadControl", 1.0)
-    
-    # create algorithm
-    ops.algorithm("Linear")
-    
-    ops.probabilityTransformation('Nataf')
-    
-    # create analysis object
-    ops.analysis("Static")
 
     # Transform random variables from standard normal to actual space
     # 1. Create random values in standard normal space
     jj = 0
     for rv in ops.getRVTags():
         u[jj] = norm.ppf(np.random.rand())
-        #u[jj] = 0.0
         jj = jj+1
 
     # 2. Transform to real space
     x = ops.transformUtoX(*u)
-    print(j,x)
+    #print(j,x)
+    print(j)
     # 3. Update parameters with random realizations
     jj = 0
     for rv in ops.getRVTags():
@@ -221,14 +235,13 @@ for j in range(Ntrials):
 
         
 
-
-
-
-
-
     # ------------------------------
     # Finally perform the analysis
     # ------------------------------
+
+    data_volume = np.zeros(nsteps+1)
+    data_height = np.zeros(nsteps+1)
+    end_step = nsteps
 
     # Create dict of each node that can have ponding load applied and initilize load to zero
     EmptyPondingLoad = dict()
@@ -238,9 +251,6 @@ for j in range(Ntrials):
         if not PondingLoadCells[iCell].nodeJ in EmptyPondingLoad:
             EmptyPondingLoad[PondingLoadCells[iCell].nodeJ] = 0.0
         
-    data_volume = np.zeros(nsteps+1)
-    data_height = np.zeros(nsteps+1)
-    end_step = nsteps
 
     # Perform analysis, ramping up volume      
     zw = 0.1
@@ -274,24 +284,16 @@ for j in range(Ntrials):
 
         # Apply difference to model
         #
-        # Remove time series and pattern so there's not
-        # duplicate tag errors in MC loop
-        ops.remove('timeSeries',iStep)
-        ops.remove('loadPattern',iStep)
-        ops.timeSeries("Linear", iStep)
-        ops.pattern("Plain", iStep, iStep)
+        ops.pattern("Plain", iStep, 1)
         for iNode in UpdatedPondingLoad:
             fy = UpdatedPondingLoad[iNode] - CurrentPondingLoad[iNode]
             ops.load(iNode, 0.0, fy, 0.0)
         CurrentPondingLoad = UpdatedPondingLoad
 
         # Run analysis
-        ops.analyze(1)
-        #ops.reactions()
-        ops.loadConst('-time',0.0)
-        #for i in range(nele+1):
-        #    print(ops.nodeDisp(i,2))
-
+        ok = ops.analyze(1)
+        if ok < 0:
+            break
 
         # Store Data
         data_volume[iStep+1] = target_volume
@@ -301,6 +303,15 @@ for j in range(Ntrials):
         if zw <= -1:
             end_step = iStep+1
             break        
+
+    if max(data_height) > hFail:
+        Nfailed = Nfailed+1
+
+    # Remove time series and pattern so there's not
+    # duplicate tag errors in MC loop
+    for iStep in range(nsteps):
+        ops.remove('loadPattern',iStep)
+
 
     #wi = gamma*zw*tw
     #deltai = -5*wi*L**4/(384*E*Iz)
@@ -313,12 +324,16 @@ for j in range(Ntrials):
     #print('OpenSees:    %.5f' % uy)
     #print('Percent Diff %.2f%%' % (100*(uy-delta)/delta))
 
+    #print(zw,end_step)
     # Show plot
     plt.plot(data_volume[:end_step+1], data_height[:end_step+1])
     #plt.plot(data_volume, data_height)
 
+print('Probability of exceeding %.1f inch water height is %.3f\n' % (hFail,1.0*Nfailed/Ntrials))
+    
 plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
-plt.ylim([-10,5])
+plt.ylim([-10,15])
+plt.grid()
 plt.show()
 
