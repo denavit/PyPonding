@@ -53,7 +53,7 @@ class wf:
         return A
     
     def Iz(self):
-        Iz = (1/12)*self.bf*self.d**3 - (1/12)*(self.bf-self.tw)*self.dw()**3
+        Iz = (1.0/12)*self.bf*self.d**3 - (1.0/12)*(self.bf-self.tw)*self.dw()**3
         return Iz
         
     def define_fiber_section(self,secTag,matTag):
@@ -84,14 +84,30 @@ nsteps = 100
 material_type = 'Elastic'
 material_type = 'ElasticPP'
 
-Fy = 50.0
-E = 29000.0
+inch = 1.0
+kip = 1.0
+
+lb = kip/1000.0
+ft = 12.0*inch
+
+ksi = kip/inch**2
+psf = lb/ft**2
+pcf = psf/ft
+
+Fy = 50.0*ksi
+E = 29000.0*ksi
 
 # W6x15
-d = 5.99
-tweb = 0.230
-bf = 5.99
-tf = 0.260
+d = 5.99*inch
+tweb = 0.230*inch
+bf = 5.99*inch
+tf = 0.260*inch
+
+# W14x22
+d = 13.74*inch
+bf = 5.0*inch
+tf = 0.335*inch
+tweb = 0.23*inch
 
 #wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
 wf_section = wf(d,tweb,bf,tf,Fy,E) # W6x15
@@ -99,19 +115,27 @@ wf_section.material_type = material_type
 # print(wf_section.A()) # 4.43 from the Steel Manual
 # print(wf_section.Iz()) # 29.1 from the Steel Manual
 
-L       = 480.0
+L       = 45*ft # 45 ft span
 A       = wf_section.A()
 Iz      = wf_section.Iz()
-gamma   = 62.4/1000/12**3
-tw      = 60.0
-zi      = 0.0
-zj      = 10.0
+gamma   = 62.4*pcf
+tw      = 8*ft # 8 ft trib width
+zi      = 0.0*inch
+# Max water height below hFail is failure
+zj      = 0*inch;     hFail = 4.9*inch
+zj      = 11.25*inch; hFail = 10.5*inch
 
-max_volume = 10*L*tw
+
+
+
+qD = 10.0*psf # 20 psf dead load
+wD = qD*tw # Dead load per length
+
+max_volume = (12*inch)*L*tw
 
 nsteps_vol = 30
 nele = 20
-vol_tol = max_volume/nsteps/100
+vol_tol = max_volume/nsteps/100.0
 mid_node = int(nele/2)
 
 # set modelbuilder
@@ -131,7 +155,7 @@ ops.geomTransf('Linear',1)
 
 # define cross section
 wf_section.define_fiber_section(1,1)
-ops.beamIntegration('Lobatto', 1, 1, 3)
+ops.beamIntegration('Lobatto', 1, 1, 4)
 #ops.beamIntegration('Legendre', 1, 1, 2)    
 
 ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
@@ -196,7 +220,11 @@ ops.analysis("Static")
 # Time series for loads
 ops.timeSeries("Constant", 1)
 
-
+# Dead load
+ops.pattern('Plain',-1,1)
+for i in range(nele):
+    ops.eleLoad('-ele',i,'-type','beamUniform',-wD)
+    
 Nrv = len(ops.getRVTags())
 u = np.zeros(Nrv)
 
@@ -207,8 +235,6 @@ Ntrials = 100
 # Number of failed MC trials
 Nfailed = 0
 
-# Max water height above hFail is failure
-hFail = 4.0
 
 
 
@@ -233,7 +259,8 @@ for j in range(Ntrials):
         ops.updateParameter(rv,x[jj])
         jj = jj+1
 
-        
+    # Dead load analysis
+    ops.analyze(1)
 
     # ------------------------------
     # Finally perform the analysis
@@ -292,19 +319,17 @@ for j in range(Ntrials):
 
         # Run analysis
         ok = ops.analyze(1)
-        if ok < 0:
-            break
 
         # Store Data
         data_volume[iStep+1] = target_volume
         data_height[iStep+1] = zw
         
-        # Stop analysis if water level too low
-        if zw <= -1:
+        # Stop analysis if water level too low or analysis failed
+        if zw <= -4*inch or ok < 0:
             end_step = iStep+1
             break        
 
-    if max(data_height) > hFail:
+    if max(data_height) <= hFail:
         Nfailed = Nfailed+1
 
     # Remove time series and pattern so there's not
@@ -329,8 +354,9 @@ for j in range(Ntrials):
     plt.plot(data_volume[:end_step+1], data_height[:end_step+1])
     #plt.plot(data_volume, data_height)
 
-print('Probability of exceeding %.1f inch water height is %.3f\n' % (hFail,1.0*Nfailed/Ntrials))
-    
+print('Probability of failure at less than %.1f inch water height is %.3f\n' % (hFail,1.0*Nfailed/Ntrials))
+
+plt.title('W14x22, zj = %.2f in' % zj)
 plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
 plt.ylim([-10,15])
