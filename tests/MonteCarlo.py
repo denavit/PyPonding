@@ -34,13 +34,14 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
         
 
 class wf:
-    def __init__(self,d,tw,bf,tf,Fy,E):
+    def __init__(self,d,tw,bf,tf,Fy,E,Hk):
         self.d  = d
         self.tw = tw
         self.bf = bf
         self.tf = tf
         self.Fy = Fy
         self.E  = E
+        self.Hk = Hk
         self.material_type = 'ElasticPP'
         self.num_fiber = 20
         
@@ -61,8 +62,9 @@ class wf:
             ops.uniaxialMaterial('Elastic', matTag, self.E)
         elif self.material_type == 'ElasticPP':
             # ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E)
-            ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, 0.001)
-            #ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, 0.001*E)
+            b = self.Hk/(self.E+self.Hk)
+            #ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, b)
+            ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, self.Hk)
         else:
             raise Exception('Input Error - unknown material type (%s)' % self.material_type)
         #ops.section('Fiber', secTag)
@@ -86,9 +88,13 @@ material_type = 'ElasticPP'
 
 inch = 1.0
 kip = 1.0
+minute = 1.0
 
 lb = kip/1000.0
 ft = 12.0*inch
+hr = 60*minute
+
+gal = 0.133681*ft**3
 
 ksi = kip/inch**2
 psf = lb/ft**2
@@ -96,6 +102,7 @@ pcf = psf/ft
 
 Fy = 50.0*ksi
 E = 29000.0*ksi
+Hk = 29.0*ksi
 
 # W6x15
 d = 5.99*inch
@@ -110,28 +117,31 @@ tf = 0.335*inch
 tweb = 0.23*inch
 
 #wf_section = wf(5.99,0.230,5.99,0.260,Fy,E) # W6x15
-wf_section = wf(d,tweb,bf,tf,Fy,E) # W6x15
+wf_section = wf(d,tweb,bf,tf,Fy,E,Hk) # W6x15
 wf_section.material_type = material_type
 # print(wf_section.A()) # 4.43 from the Steel Manual
 # print(wf_section.Iz()) # 29.1 from the Steel Manual
 
-L       = 45*ft # 45 ft span
+L       = 45*ft # span length
 A       = wf_section.A()
 Iz      = wf_section.Iz()
 gamma   = 62.4*pcf
-tw      = 8*ft # 8 ft trib width
+tw      = 5*ft # tributary width
 zi      = 0.0*inch
 # Max water height below hFail is failure
 zj      = 0*inch;     hFail = 4.9*inch
-zj      = 11.25*inch; hFail = 10.5*inch
+#zj      = 11.25*inch; hFail = 10.5*inch
+
+# Hourly rainfall rate (in/hr)
+rate = 3.75*inch/hr
 
 
 
 
-qD = 10.0*psf # 20 psf dead load
+qD = 20.0*psf # dead load
 wD = qD*tw # Dead load per length
 
-max_volume = (12*inch)*L*tw
+max_volume = (15*inch)*L*tw
 
 nsteps_vol = 30
 nele = 20
@@ -158,12 +168,21 @@ wf_section.define_fiber_section(1,1)
 ops.beamIntegration('Lobatto', 1, 1, 4)
 #ops.beamIntegration('Legendre', 1, 1, 2)    
 
+# Time series for loads
+ops.timeSeries("Constant", 1)
+
+# Dead load
+ops.pattern('Plain',-1,1)
+
+    
 ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
 ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E)
 ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
 ops.randomVariable(4,'normal','-mean',tweb,'-stdv',0.02*tweb)
 ops.randomVariable(5,'normal','-mean',bf,'-stdv',0.02*bf)
 ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
+ops.randomVariable(7,'normal','-mean',-wD,'-stdv',-0.1*wD)
+ops.randomVariable(8,'lognormal','-mean',Hk,'-stdv',0.05*Hk)
 
 ops.probabilityTransformation('Nataf')
 
@@ -173,6 +192,18 @@ ops.parameter(3)
 ops.parameter(4)
 ops.parameter(5)
 ops.parameter(6)
+ops.parameter(7)
+ops.parameter(8)
+
+gammaRVTag = 9
+ops.randomVariable(gammaRVTag,'lognormal','-mean',gamma,'-stdv',0.1*gamma)
+ops.parameter(gammaRVTag)
+ops.updateParameter(gammaRVTag,gamma)
+
+rateRVTag = 10
+ops.randomVariable(rateRVTag,'lognormal','-mean',rate,'-stdv',0.2*rate)
+ops.parameter(rateRVTag)
+ops.updateParameter(rateRVTag,rate)
 
 # define elements
 for i in range(nele):
@@ -184,21 +215,31 @@ for i in range(nele):
     ops.addToParameter(3,'element',i,'d')
     ops.addToParameter(4,'element',i,'tw')
     ops.addToParameter(5,'element',i,'bf')
-    ops.addToParameter(6,'element',i,'tf')        
+    ops.addToParameter(6,'element',i,'tf')
+    ops.addToParameter(8,'element',i,'Hkin')    
 
-# define ponding load cells    
-PondingLoadCells = dict()
-for i in range(nele):
-    PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
+    ops.eleLoad('-ele',i,'-type','beamUniform',-wD)
+    ops.addToParameter(7,'loadPattern',-1,'elementLoad',i,'wy')
 
-
+legendLabel = {
+    9: 'gamma',
+    10: 'rate',
+    1: 'Fy',
+    2: 'E',
+    3: 'd',
+    4: 'tw',
+    5: 'bf',
+    6: 'tf',
+    8: 'Hkin',
+    7: 'wD'
+}
 
 # ------------------------------
 # Start of analysis generation
 # ------------------------------
 
 # create SOE
-ops.system("BandSPD")
+ops.system("UmfPack")
 
 # create DOF number
 ops.numberer("RCM")
@@ -217,28 +258,25 @@ ops.probabilityTransformation('Nataf')
 # create analysis object
 ops.analysis("Static")
 
-# Time series for loads
-ops.timeSeries("Constant", 1)
 
-# Dead load
-ops.pattern('Plain',-1,1)
-for i in range(nele):
-    ops.eleLoad('-ele',i,'-type','beamUniform',-wD)
-    
+Nparam = len(ops.getParamTags())
 Nrv = len(ops.getRVTags())
 u = np.zeros(Nrv)
 
 # Number of Monte Carlo trials
+Ntrials = 1000
 Ntrials = 100
-#Ntrials = 2
 
 # Number of failed MC trials
 Nfailed = 0
 
+duPlot = np.zeros((nsteps+1,Nparam))
+meanPlot = np.zeros((nsteps+1,2))
 
+plt.figure(1)
+plt.subplot(2,1,1)
 
-
-for j in range(Ntrials):
+for j in range(Ntrials+1):
 
     ops.reset()
 
@@ -247,6 +285,8 @@ for j in range(Ntrials):
     jj = 0
     for rv in ops.getRVTags():
         u[jj] = norm.ppf(np.random.rand())
+        if j == Ntrials:
+            u[jj] = 0
         jj = jj+1
 
     # 2. Transform to real space
@@ -261,6 +301,14 @@ for j in range(Ntrials):
 
     # Dead load analysis
     ops.analyze(1)
+
+    # define ponding load cells
+    # Inside the MC loop so we can make gamma random
+    #
+    gamma = x[gammaRVTag-1]
+    PondingLoadCells = dict()
+    for i in range(nele):
+        PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
     # ------------------------------
     # Finally perform the analysis
@@ -279,6 +327,9 @@ for j in range(Ntrials):
             EmptyPondingLoad[PondingLoadCells[iCell].nodeJ] = 0.0
         
 
+    if j == Ntrials:
+        ops.sensitivityAlgorithm('-computeAtEachStep')
+            
     # Perform analysis, ramping up volume      
     zw = 0.1
     CurrentPondingLoad = EmptyPondingLoad.copy()
@@ -323,16 +374,24 @@ for j in range(Ntrials):
         # Store Data
         data_volume[iStep+1] = target_volume
         data_height[iStep+1] = zw
-        
+
+        if j == Ntrials:
+            meanPlot[iStep+1,0] = target_volume
+            meanPlot[iStep+1,1] = zw
+            for rv in ops.getRVTags():
+                cov = ops.getStdv(rv)/ops.getMean(rv)
+                # Negative sign because disp is downward
+                duPlot[iStep+1,rv-1] = -ops.sensNodeDisp(mid_node,2,rv)*abs(ops.getStdv(rv))
+                  
         # Stop analysis if water level too low or analysis failed
         if zw <= -4*inch or ok < 0:
             end_step = iStep+1
             break        
 
-    if max(data_height) <= hFail:
+    if j < Ntrials and max(data_height) <= hFail:
         Nfailed = Nfailed+1
 
-    # Remove time series and pattern so there's not
+    # Remove patterns so there's not
     # duplicate tag errors in MC loop
     for iStep in range(nsteps):
         ops.remove('loadPattern',iStep)
@@ -351,15 +410,30 @@ for j in range(Ntrials):
 
     #print(zw,end_step)
     # Show plot
-    plt.plot(data_volume[:end_step+1], data_height[:end_step+1])
+    plt.plot(data_volume[:end_step+1], data_height[:end_step+1],'y',linewidth=0.5)
     #plt.plot(data_volume, data_height)
 
-print('Probability of failure at less than %.1f inch water height is %.3f\n' % (hFail,1.0*Nfailed/Ntrials))
+pf = 1.0*Nfailed/Ntrials
+print('Probability of failure at less than %.1f inch water height is %.3f\n' % (hFail,pf))
 
-plt.title('W14x22, zj = %.2f in' % zj)
-plt.xlabel('Water Volume (in^3)')
+plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
+plt.plot([0,max_volume],[hFail,hFail],'k:')
+plt.plot(meanPlot[:end_step+1,0],meanPlot[:end_step+1,1],'k',linewidth=2)
+#plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
-plt.ylim([-10,15])
+plt.ylim([-10*inch,15*inch])
+plt.xlim([0,max_volume])
+plt.grid()
+#plt.show()
+
+plt.subplot(2,1,2)
+#plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
+for rv in ops.getRVTags():
+    plt.plot(data_volume[:end_step+1],duPlot[:end_step+1,rv-1],label=legendLabel[rv])
+plt.xlabel('Water Volume (in^3)')
+plt.ylabel('$\Delta u$ (in)')
+plt.ylim([-1*inch,0])
+plt.xlim([0,max_volume])
+plt.legend(loc='lower left')
 plt.grid()
 plt.show()
-
