@@ -124,7 +124,7 @@ class steel_beam(basic_structure.basic_structure):
         self.BuildModel(tau)
         PA = FE.PondingAnalysis(self.model,'Constant_Level')
         PA.max_iterations_z = 60
-        res = PA.run({},zw)
+        res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},zw)
         if res != 0:
             print('Not converged')
             return float('nan')
@@ -151,7 +151,7 @@ class steel_beam(basic_structure.basic_structure):
                 self.BuildModel(tau)
                 PA = FE.PondingAnalysis(self.model,'Constant_Level')
                 PA.max_iterations_z = 60
-                res = PA.run({},zw)
+                res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},zw)
                 if res != 0:
                     print('Not converged')
                     return float('nan')
@@ -174,7 +174,7 @@ class steel_beam(basic_structure.basic_structure):
             self.BuildModel(tau)
             PA = FE.PondingAnalysis(self.model,'Constant_Level')
             PA.max_iterations_z = 60
-            res = PA.run({},zw)
+            res = PA.run({'DEAD':self.alpha*self.LF_D,'SNOW':self.alpha*self.LF_S2},zw)
             
             if res != 0:
                 print('Not converged')
