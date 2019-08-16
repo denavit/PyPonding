@@ -33,7 +33,7 @@ class basic_structure:
         else:
             PA = FE.PondingAnalysis(self.model,'No_Ponding_Effect')
         
-        PA.max_iterations_z = 40
+        PA.max_iterations_z = 100
         PA.use_stored_analysis = use_stored
         if use_stored:
             self.model.StoreAnalysis()
