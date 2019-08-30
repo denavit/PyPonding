@@ -6,6 +6,8 @@ from PyPonding.structures.steel_beam import steel_beam
 from math import ceil
 
 class wf:
+    geomTransfType = 'Linear'
+
     def __init__(self,d,tw,bf,tf,Fy,E,Hk):
         self.d  = d             # Depth
         self.tw = tw            # Thickness of the web
@@ -104,7 +106,7 @@ class wf:
         ops.fix(self.num_elements,0,1,0)
 
         # define coordinate transformation
-        ops.geomTransf('Linear',1)
+        ops.geomTransf(self.geomTransfType,1)
 
         # define cross section
         self.define_fiber_section(1,1)
@@ -209,9 +211,16 @@ class wf:
             if zw <= -1:
                 end_step = iStep+1
                 break        
+                
+            if zw <= 0.95*np.amax(data_height):
+                end_step = iStep+1
+                break
             
         # Wipe Analysis
         ops.wipe()
+    
+        data_volume = data_volume[:end_step]
+        data_height = data_height[:end_step]
     
         return (data_volume,data_height)
 
