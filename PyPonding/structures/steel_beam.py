@@ -91,7 +91,11 @@ class steel_beam(basic_structure.basic_structure):
             V[2*i+1] = -ele_force.item(4)            
         return (x,M,V)
        
-       
+    def Maximum_Shear(self,results):
+        (Ri,Rj) = self.Reactions(results)
+        Vmax = max(Ri,Rj)
+        return Vmax   
+    
     def Maximum_Moment(self,results):
         (x,M,V) = self.Moment_and_Shear(results)
         Mmax = np.amax(np.absolute(M))
