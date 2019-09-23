@@ -634,6 +634,53 @@ class PondingAnalysis:
                     self.r = r
                     return 0
                     
+        elif self.type == 'Modified_Rain_Load':
+            z = x
+            
+            f_nodal = self.model.GetNodalForceVector({'DEAD':1.0})
+            
+            # Run Initial Analysis
+            if self.use_stored_analysis:
+                (d,r) = self.model.SolveForDispWithStored(f_nodal)
+            else:
+                K = self.model.GetGlobalStiffnessMatrix()
+                (d,r) = self.model.SolveForDisp(K,f_nodal)
+                
+            # Iterate
+            for i in range(self.max_iterations_z):
+                d_last = d
+                f = f_nodal + self.model.GetPondingForceVector(d,z)
+                
+                if self.use_stored_analysis:
+                    (d,r) = self.model.SolveForDispWithStored(f)
+                else:
+                    (d,r) = self.model.SolveForDisp(K,f)
+                
+                if self.output_level > 0:
+                    print('Min Deflection: %.3f \tNode Disp Incr. %.6f' % (min(d),np.linalg.norm(d-d_last)))
+                if np.linalg.norm(d-d_last) < self.tol_z:
+                    if self.output_level > 0:
+                        print('Converged')
+                    
+                    # subtract out dead load and add back in defined load combination
+                    f_nodal_1 = self.model.GetNodalForceVector({'DEAD':-1.0})
+                    f_nodal_2 = self.model.GetNodalForceVector(load_factors)
+
+                    if self.use_stored_analysis:
+                        (d1,r1) = self.model.SolveForDispWithStored(f_nodal_1)
+                        (d2,r2) = self.model.SolveForDispWithStored(f_nodal_2)
+                    else:
+                        K = self.model.GetGlobalStiffnessMatrix()
+                        (d1,r1) = self.model.SolveForDisp(K,f_nodal_1)
+                        (d2,r2) = self.model.SolveForDisp(K,f_nodal_2)
+                    
+                    # store results
+                    self.load_factors = load_factors
+                    self.z = z                    
+                    self.d = 1.6*(d+d1)+d2 # @todo make option for other rain load factors
+                    self.r = 1.6*(r+r1)+r2
+                    return 0            
+        
         elif self.type == 'Constant_Volume':
             V = x
             

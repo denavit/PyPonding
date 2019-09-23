@@ -12,6 +12,7 @@ class basic_structure:
     gammas  = 20/1000/12**3
     hs      = 12
     include_ponding_effect = True
+    modified_rain_load = False
     
     def __init__(self):
         pass    
@@ -29,7 +30,10 @@ class basic_structure:
         self.model.use_sparse_matrix_solver = use_sparse
         
         if self.include_ponding_effect:   
-            PA = FE.PondingAnalysis(self.model,'Constant_Level')
+            if self.modified_rain_load:
+                PA = FE.PondingAnalysis(self.model,'Modified_Rain_Load')
+            else:
+                PA = FE.PondingAnalysis(self.model,'Constant_Level')
         else:
             PA = FE.PondingAnalysis(self.model,'No_Ponding_Effect')
         

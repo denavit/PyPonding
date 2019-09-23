@@ -66,7 +66,10 @@ class steel_beam(basic_structure.basic_structure):
             ni = 'n%02i' % i
             nj = 'n%02i' % (i+1)
             model.AddElement('e%02i'%i,'ElasticBeam2d',(ni,nj),stiffness_reduction*self.E,self.I,self.A)
-            model.AddPondingLoadCell('p%02i'%i,'2d',(ni,nj),self.alpha*self.LF_P*self.gamma,self.tw)
+            if self.modified_rain_load: 
+                model.AddPondingLoadCell('p%02i'%i,'2d',(ni,nj),self.alpha*self.gamma,self.tw)
+            else:
+                model.AddPondingLoadCell('p%02i'%i,'2d',(ni,nj),self.alpha*self.LF_P*self.gamma,self.tw)
             model.PondingLoadCells['p%02i'%i].gammas = self.alpha*self.LF_S1*self.gammas
             model.PondingLoadCells['p%02i'%i].hs = self.hs
         

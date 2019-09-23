@@ -3,7 +3,7 @@ import openseespy.opensees as ops
 import PyPonding.FE as FE
 from PyPonding.PondingLoadCell_OPS import PondingLoadCell2d_OPS
 from PyPonding.structures.steel_beam import steel_beam
-from math import ceil
+from math import pi,ceil
 
 class wf:
     geomTransfType = 'Linear'
@@ -46,7 +46,11 @@ class wf:
     def Iz(self):
         Iz = (1.0/12)*self.bf*self.d**3 - (1.0/12)*(self.bf-self.tw)*self.dw()**3
         return Iz
-        
+     
+    def Sz(self):
+        Sz = self.Iz()/(self.d/2)
+        return Sz
+     
     def Zz(self):
         Zz = 2*((self.tf*self.bf)*(self.d/2-self.tf/2) + (self.dw()/2*self.tw)*(self.dw()/4));
         return Zz
@@ -236,8 +240,8 @@ class wf:
         elastic_beam.A   = self.A()
         elastic_beam.I   = self.Iz()
 
-        elastic_beam.Z   = self.Zz()
-        elastic_beam.Fy  = self.Fy
+        elastic_beam.Mc  = self.Fy*self.Zz()
+        # elastic_beam.Vc  = 0.6*self.Fy*self.d*self.tw   @todo add this?
 
         elastic_beam.alpha   = 1.0
         elastic_beam.LF_D    = 1.0
@@ -250,7 +254,54 @@ class wf:
         elastic_beam.hs      = 0.0
         elastic_beam.BuildModel();
         return elastic_beam
-        
+     
+
+    def maximum_permitted_zw(self,method):
+        if method == 'AISC Appendix 2':
+            Cs = (self.gamma*self.TW*self.L**4)/(pi**4*self.E*self.Iz())
+            #Us_limit = Cs/(1-Cs)
+            #fo_limit = 0.8*self.Fy/(Us_limit+1)
+            #Mo_limit = fo_limit*self.S
+            Mo_limit = 0.8*self.Fy*self.Sz()*(1-Cs)
+            
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.include_ponding_effect = False
+            elastic_beam.Mc     = Mo_limit
+            zw1 = elastic_beam.Run_To_Strength_Limit()
+
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.6
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw2 = elastic_beam.Run_To_Strength_Limit()
+            
+            zw = min(zw1,zw2)
+            
+        elif method == 'DAMP':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.E      = 0.8*self.E
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.2
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw = elastic_beam.Run_To_Strength_Limit()
+            
+        elif method == 'Proposed for ASCE 7':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.6
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            elastic_beam.modified_rain_load = True
+            zw = elastic_beam.Run_To_Strength_Limit()
+            
+        else:
+            print('Unknown method: %s' % method)
+            zw = float('nan')
+            
+        return zw
+
+            
 wf_shapes = {
     'W44X335': {'W': 335,'A': 98.5,'d': 44,'ddet': 44,'bf': 15.9,'bfdet': 16,'tw': 1.03,'twdet': 1,'twdet/2': 0.5,'tf': 1.77,'tfdet': 1.75,'kdes': 2.56,'kdet': 3,'k1': 1.75,'bf/2tf': 4.5,'h/tw': 38,'Ix': 31100,'Zx': 1620,'Sx': 1410,'rx': 17.8,'Iy': 1200,'Zy': 236,'Sy': 150,'ry': 3.49,'J': 74.7,'Cw': 535000,'Wno': 168,'Sw1': 1180,'Qf': 278,'Qw': 805,'rts': 4.24,'ho': 42.2,'PA': 132,'PB': 148,'PC': 104,'PD': 120,'T': 38,'WGi': 5.5,'metric_label': 'W1100X499'},
     'W44X290': {'W': 290,'A': 85.4,'d': 43.6,'ddet': 43.625,'bf': 15.8,'bfdet': 15.875,'tw': 0.865,'twdet': 0.875,'twdet/2': 0.4375,'tf': 1.58,'tfdet': 1.5625,'kdes': 2.36,'kdet': 2.8125,'k1': 1.625,'bf/2tf': 5.02,'h/tw': 45,'Ix': 27000,'Zx': 1410,'Sx': 1240,'rx': 17.8,'Iy': 1040,'Zy': 205,'Sy': 132,'ry': 3.49,'J': 50.9,'Cw': 461000,'Wno': 166,'Sw1': 1040,'Qf': 248,'Qw': 701,'rts': 4.2,'ho': 42,'PA': 131,'PB': 147,'PC': 103,'PD': 119,'T': 38,'WGi': 5.5,'metric_label': 'W1100X433'},
