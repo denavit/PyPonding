@@ -87,11 +87,6 @@ class wf:
     def perform_OpenSees_analysis(self):
         mid_node = int(self.num_elements/2)
         
-        # Initilize data        
-        data_volume = np.zeros((self.num_steps+1,1))
-        data_height = np.zeros((self.num_steps+1,1))
-        end_step = self.num_steps+1
-        
         # set modelbuilder
         ops.model('basic', '-ndm', 2, '-ndf', 3)
 
@@ -150,6 +145,20 @@ class wf:
         # create analysis object
         ops.analysis("Static")
 
+        # Run dead load analysis
+        ops.analyze(1)
+        zo = float('inf')
+        for i in range(self.num_elements+1):
+            iz = ops.nodeCoord(i, 2) + ops.nodeDisp(i, 2)
+            if iz < zo:
+                zo = iz
+        
+        # Initilize data        
+        data_volume = np.zeros((self.num_steps+1,1))
+        data_height = np.full((self.num_steps+1,1),zo)
+        end_step = self.num_steps+1        
+        
+        
         # ------------------------------
         # Finally perform the analysis
         # ------------------------------
@@ -168,7 +177,7 @@ class wf:
                 EmptyPondingLoad[PondingLoadCells[iCell].nodeJ] = 0.0
 
         # Perform analysis, ramping up volume      
-        zw = 0.1
+        zw = zo+0.1
         CurrentPondingLoad = EmptyPondingLoad.copy()
         for iStep in range(0,self.num_steps):
             
@@ -212,11 +221,7 @@ class wf:
             data_height[iStep+1] = zw
 
             # Stop analysis if water level too low
-            if zw <= -1:
-                end_step = iStep+1
-                break        
-                
-            if zw <= 0.95*np.amax(data_height):
+            if (zw-zo) <= 0.95*(np.amax(data_height)-zo):
                 end_step = iStep+1
                 break
             

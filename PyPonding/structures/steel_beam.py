@@ -137,7 +137,7 @@ class steel_beam(basic_structure.basic_structure):
     
     def determine_stiffness_reduction(self,zw,Mmax=0.0,tol=0.00001):
         if Mmax == 0:
-            Mmax = self.Z*self.Fy
+            Mmax = self.Mc
         
         # Try without any stiffness reduction
         tau = 1.0

@@ -22,9 +22,9 @@ pcf = psf/ft
 # Input parameters
 Fy      = 50.0*ksi
 E       = 29000.0*ksi
-Hk      = E/1000.0
+Hk      = E/10000.0
 
-TW      = 5*ft
+TW      = 10.0*ft
 
 shape_name = 'W24X55';
 L       = 40*ft
@@ -52,8 +52,9 @@ wf_section.wD       = qD*TW # Dead load per length
 
 # Set OpenSees analysis options
 wf_section.material_type = 'Hardening'
-wf_section.max_volume = (50*inch)*wf_section.L*wf_section.TW
-wf_section.vol_tol = wf_section.max_volume/wf_section.num_steps/100.
+wf_section.max_volume = (500*inch)*wf_section.L*wf_section.TW
+wf_section.num_steps = 10000
+wf_section.vol_tol = wf_section.max_volume/wf_section.num_steps/10000.
 
 # Run OpenSees analysis 
 (data_volume,data_height) = wf_section.perform_OpenSees_analysis();

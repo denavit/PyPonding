@@ -22,9 +22,9 @@ pcf = psf/ft
 # Input parameters
 Fy      = 50.0*ksi
 E       = 29000.0*ksi
-Hk      = E/1000.0
+Hk      = E/10000.0
 
-TW      = 5*ft
+TW      = 10.0*ft
 
 list_spans_and_sections = [
     (20*ft, 'W8X10'),(20*ft,'W10X12'),(20*ft,'W12X16'),(20*ft,'W12X22'),(20*ft,'W14X22'),
@@ -37,7 +37,7 @@ list_qD = [10.0*psf,20.0*psf,30.0*psf]
 
 # Run Analysis
 f = open('StrengthEvaluationOutput.csv','w')
-f.write('shape_name,L (ft),slope (in/ft),dead load (psf),zmax_inelastic,zmax_elastic,tau\n')
+f.write('shape_name,L (ft),slope (in/ft),dead load (psf),zmax_inelastic,zmax_elastic,tau,zmax_elastic_reduced\n')
 for span_and_section in list_spans_and_sections:
     L = span_and_section[0]
     shape_name = span_and_section[1]
@@ -64,8 +64,9 @@ for span_and_section in list_spans_and_sections:
 
             # Set OpenSees analysis options
             wf_section.material_type = 'Hardening'
-            wf_section.max_volume = (50*inch)*wf_section.L*wf_section.TW
-            wf_section.vol_tol = wf_section.max_volume/wf_section.num_steps/100.
+            wf_section.max_volume = (500*inch)*wf_section.L*wf_section.TW
+            wf_section.num_steps = 10000
+            wf_section.vol_tol = wf_section.max_volume/wf_section.num_steps/10000.
 
             # Run OpenSees analysis 
             (data_volume,data_height) = wf_section.perform_OpenSees_analysis();
@@ -74,9 +75,16 @@ for span_and_section in list_spans_and_sections:
 
             # Elastic Analyses
             elastic_beam = wf_section.steel_beam_object()
-            zmax_elastic = elastic_beam.Run_To_Strength_Limit(start_level = 1.0,max_level=200.0)
+            
+            elastic_beam.alpha = 1.0
+            elastic_beam.LF_D  = 1.0
+            elastic_beam.LF_S2 = 0.0
+            zmax_elastic = elastic_beam.Run_To_Strength_Limit(start_level = 1.0,max_level=500.0)
             tau = elastic_beam.determine_stiffness_reduction(zmax_inelastic)
-
+                        
+            elastic_beam.E = 0.8*elastic_beam.E
+            zmax_elastic_reduced = elastic_beam.Run_To_Strength_Limit(start_level = 1.0,max_level=500.0)
+            
             # Print Data
-            f.write('%s,%i,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (shape_name,L/ft,slope/in_per_ft,qD/psf,zmax_inelastic,zmax_elastic,tau))
+            f.write('%s,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (shape_name,L/ft,slope/in_per_ft,qD/psf,zmax_inelastic,zmax_elastic,tau,zmax_elastic_reduced))
 f.close()
