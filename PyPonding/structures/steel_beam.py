@@ -1,5 +1,5 @@
 import numpy as np
-from math import sqrt
+from math import sqrt,isnan
 from PyPonding import FE
 from PyPonding.structures import basic_structure
 
@@ -18,8 +18,8 @@ class steel_beam(basic_structure.basic_structure):
     I   = 182
 
     # Strength properties 
-    Z   = float('nan')
-    Fy  = float('nan')
+    Mc  = float('nan')
+    Vc  = float('nan')
     
     # Analysis options
     nele = 20
@@ -104,15 +104,28 @@ class steel_beam(basic_structure.basic_structure):
     def Strength_Ratio(self,results):
         (x,M,V) = self.Moment_and_Shear(results)
         
-        # Moment 
-        Mmax = np.amax(np.absolute(M))
-        ind  = np.argmax(np.absolute(M))
+        SR = 0.0
+        SR_note = 'No limit' 
         
-        SR      = Mmax/(self.Z*self.Fy)
-        SR_note = 'Moment at x/L = %0.3f' % (x[ind]/self.L) 
+        # Moment 
+        if ~isnan(self.Mc):
+            Mr  = np.amax(np.absolute(M))
+            ind = np.argmax(np.absolute(M))
+            
+            iSR = Mr/self.Mc
+            if iSR > SR:
+                SR = iSR
+                SR_note = 'Moment at x/L = %0.3f' % (x[ind]/self.L) 
         
         # Shear
-        # @todo - check shear also
+        if ~isnan(self.Vc):
+            Vr  = np.amax(np.absolute(V))
+            ind = np.argmax(np.absolute(V))
+            
+            iSR = Vr/self.Vc
+            if iSR > SR:
+                SR = iSR
+                SR_note = 'Shear at x/L = %0.3f' % (x[ind]/self.L)         
         
         return (SR,SR_note)
        
