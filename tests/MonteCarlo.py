@@ -82,6 +82,7 @@ class wf:
   
 
 nsteps = 100
+nsteps = 250
 
 material_type = 'Elastic'
 material_type = 'ElasticPP'
@@ -139,6 +140,7 @@ rate = 3.75*inch/hr
 
 
 qD = 20.0*psf # dead load
+#qD = 0.01*psf
 wD = qD*tw # Dead load per length
 
 max_volume = (15*inch)*L*tw
@@ -165,8 +167,11 @@ ops.geomTransf('Linear',1)
 
 # define cross section
 wf_section.define_fiber_section(1,1)
-ops.beamIntegration('Lobatto', 1, 1, 4)
+Np = 4
+ops.beamIntegration('Lobatto', 1, 1, Np)
 #ops.beamIntegration('Legendre', 1, 1, 2)    
+
+EIplot = np.zeros((nele*Np,nsteps+1))
 
 # Time series for loads
 ops.timeSeries("Constant", 1)
@@ -382,6 +387,19 @@ for j in range(Ntrials+1):
                 cov = ops.getStdv(rv)/ops.getMean(rv)
                 # Negative sign because disp is downward
                 duPlot[iStep+1,rv-1] = -ops.sensNodeDisp(mid_node,2,rv)*abs(ops.getStdv(rv))
+                    
+            ix = 0
+            for e in range(nele):
+                [I,J] = ops.eleNodes(e)
+                XI = ops.nodeCoord(I,'X')
+                XJ = ops.nodeCoord(J,'X')
+                Lele = XJ-XI
+                for ip in range(Np):
+                    x = ops.sectionLocation(e,ip+1)
+                    EIplot[ix,0] = XI + x
+                    ks = ops.sectionStiffness(e,ip+1)
+                    EIplot[ix,iStep+1] = ks[3]
+                    ix = ix+1
                   
         # Stop analysis if water level too low or analysis failed
         if zw <= -4*inch or ok < 0:
@@ -436,4 +454,14 @@ plt.ylim([-1*inch,0])
 plt.xlim([0,max_volume])
 plt.legend(loc='lower left')
 plt.grid()
+plt.show()
+
+
+plt.figure()
+for i in range(nsteps):
+    plt.plot(EIplot[:,0],EIplot[:,i+1],'k')
+plt.grid()
+plt.xlabel('x (in)')
+plt.ylabel('EI (kip-in^2)')
+plt.title('Flexural Stiffness along Beam at all %d Steps' % nsteps)
 plt.show()
