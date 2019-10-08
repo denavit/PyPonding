@@ -57,12 +57,12 @@ wf_section.num_steps = 10000
 wf_section.vol_tol = wf_section.max_volume/wf_section.num_steps/10000.
 
 # Run First OpenSees analysis 
+wf_section.frc = 0.0
 (data_volume_1,data_height_1) = wf_section.perform_OpenSees_analysis();
 
 
 # Run Second OpenSees analysis 
-#wf_section.Fy = 55.0*ksi
-wf_section.geomTransfType = 'Corotational'
+wf_section.frc = -0.3*Fy
 (data_volume_2,data_height_2) = wf_section.perform_OpenSees_analysis();
 
 
