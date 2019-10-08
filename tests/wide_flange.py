@@ -16,6 +16,8 @@ class wf:
         self.Fy = Fy            # Yield stree
         self.E  = E             # Elastic modulus
         self.Hk = Hk            # Kinematic hardening modulus 
+        self.frc = 0.0          # Maximum compressive residual stress (Lehigh pattern)
+        self.num_regions = 10   # Number of regions for the discretization of residual stress
         
         self.L  = float('nan')  # Beam length (span)
         self.TW = float('nan')  # Tributary width
@@ -59,28 +61,62 @@ class wf:
         return self.Fy*self.Zz()
        
     def define_fiber_section(self,secTag,matTag):
-        if self.material_type == 'Elastic':
-            ops.uniaxialMaterial('Elastic', matTag, self.E)
-        elif self.material_type == 'ElasticPP':
-            ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E)
-        elif self.material_type == 'Steel01':
-            b = self.Hk/(self.E+self.Hk)
-            ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, b)
-        elif self.material_type == 'Hardening':
-            ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, self.Hk)
-        else:
-            raise Exception('Input Error - unknown material type (%s)' % self.material_type)
-        #ops.section('Fiber', secTag)
-        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, self.dw()/2, -self.bf/2, self.d/2, self.bf/2)
-        #numSubdivY = ceil(self.dw()*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
-        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, -self.d/2, -self.bf/2, -self.dw()/2, self.bf/2)
-        
         Nfw = ceil(self.dw()*(self.num_fiber/self.d))
         Nff = ceil(self.tf*(self.num_fiber/self.d))
-        ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,Nfw,Nff)
+        
+        if self.frc == 0 or self.material_type == 'Elastic':
+            if self.material_type == 'Elastic':
+                ops.uniaxialMaterial('Elastic', matTag, self.E)
+            elif self.material_type == 'ElasticPP':
+                ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E)
+            elif self.material_type == 'Steel01':
+                b = self.Hk/(self.E+self.Hk)
+                ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, b)
+            elif self.material_type == 'Hardening':
+                ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, self.Hk)
+            else:
+                raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            
+            ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,Nfw,Nff)
+        else: 
+            ops.section('Fiber', secTag)    
+            
+            frt = -self.frc*(self.bf*self.tf)/(self.bf*self.tf+self.tw*self.dw())
+            
+            # Define web fibers
+            if self.material_type == 'ElasticPP':
+                ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E, -self.Fy/self.E, frt/self.E)
+            elif self.material_type == 'Steel01':
+                b = self.Hk/(self.E+self.Hk)
+                ops.uniaxialMaterial('Steel01', matTag+1, self.Fy, self.E, b)
+                ops.uniaxialMaterial('InitStressMaterial', matTag , matTag+1, frt)
+            elif self.material_type == 'Hardening':
+                ops.uniaxialMaterial('Hardening', matTag+1, self.E, self.Fy, 0.0, self.Hk)
+                ops.uniaxialMaterial('InitStressMaterial', matTag , matTag+1, frt)
+            else:
+                raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            ops.patch('rect', matTag, Nfw, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
+                      
+            # Define flange fibers
+            region_width = self.bf/self.num_regions
+            for i in range(self.num_regions):
+                fri = self.frc + ((i+0.5)/self.num_regions)*(frt-self.frc)
+            
+                matTagi = matTag+2*(i+1)
+                if self.material_type == 'ElasticPP':
+                    ops.uniaxialMaterial('ElasticPP', matTagi, self.E, self.Fy/self.E, -self.Fy/self.E, fri/self.E)
+                elif self.material_type == 'Steel01':
+                    b = self.Hk/(self.E+self.Hk)
+                    ops.uniaxialMaterial('Steel01', matTagi+1, self.Fy, self.E, b)
+                    ops.uniaxialMaterial('InitStressMaterial', matTagi , matTagi+1, fri)
+                elif self.material_type == 'Hardening':
+                    ops.uniaxialMaterial('Hardening', matTagi+1, self.E, self.Fy, 0.0, self.Hk)
+                    ops.uniaxialMaterial('InitStressMaterial', matTagi , matTagi+1, fri)
+                else:
+                    raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            
+                ops.patch('rect', matTagi, Nff, 1, self.dw()/2, -region_width/2, self.d/2, region_width/2)
+                ops.patch('rect', matTagi, Nff, 1, -self.d/2, -region_width/2, -self.dw()/2, region_width/2)
         return
         
         
