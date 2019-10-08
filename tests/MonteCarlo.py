@@ -94,6 +94,9 @@ minute = 1.0
 lb = kip/1000.0
 ft = 12.0*inch
 hr = 60*minute
+sec = minute/60.0
+
+g = 386.4*inch**2/sec
 
 gal = 0.133681*ft**3
 
@@ -136,14 +139,22 @@ zj      = 0*inch;     hFail = 4.9*inch
 # Hourly rainfall rate (in/hr)
 rate = 3.75*inch/hr
 
+# "Drag coefficient" in scupper flow equation
+cd = 0.6
 
+# Scupper width
+b = 12*inch
 
+# Static head
+ds = 2*inch
 
 qD = 20.0*psf # dead load
 #qD = 0.01*psf
 wD = qD*tw # Dead load per length
 
-max_volume = (15*inch)*L*tw
+Atrib = L*tw
+max_volume = (15*inch)*Atrib
+print(max_volume)
 
 nsteps_vol = 30
 nele = 20
@@ -210,6 +221,11 @@ ops.randomVariable(rateRVTag,'lognormal','-mean',rate,'-stdv',0.2*rate)
 ops.parameter(rateRVTag)
 ops.updateParameter(rateRVTag,rate)
 
+cdRVTag = 11
+ops.randomVariable(cdRVTag,'normal','-mean',cd,'-stdv',0.02*cd)
+ops.parameter(cdRVTag)
+ops.updateParameter(cdRVTag,cd)
+
 # define elements
 for i in range(nele):
     # ops.element("elasticBeamColumn",i,i,i+1,A,E,Iz,1)
@@ -229,6 +245,7 @@ for i in range(nele):
 legendLabel = {
     9: 'gamma',
     10: 'rate',
+    11: 'cd',
     1: 'Fy',
     2: 'E',
     3: 'd',
@@ -315,6 +332,16 @@ for j in range(Ntrials+1):
     for i in range(nele):
         PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
+
+    rate = x[rateRVTag-1]
+    q = rate*Atrib
+    max_volume = q*(15*minute)
+    print(max_volume)
+    vol_tol = max_volume/nsteps/100.0
+    
+    dh = (1.5*q/(cd*b*(2*g)**0.5))**(2.0/3)
+    hFail = dh+ds
+    
     # ------------------------------
     # Finally perform the analysis
     # ------------------------------
@@ -437,24 +464,25 @@ print('Probability of failure at less than %.1f inch water height is %.3f\n' % (
 plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
 plt.plot([0,max_volume],[hFail,hFail],'k:')
 plt.plot(meanPlot[:end_step+1,0],meanPlot[:end_step+1,1],'k',linewidth=2)
-#plt.xlabel('Water Volume (in^3)')
+plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
 plt.ylim([-10*inch,15*inch])
-plt.xlim([0,max_volume])
+#plt.xlim([0,max_volume])
 plt.grid()
 #plt.show()
 
-plt.subplot(2,1,2)
+plt.figure()
+plt.subplot(2,1,1)
 #plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
 for rv in ops.getRVTags():
     plt.plot(data_volume[:end_step+1],duPlot[:end_step+1,rv-1],label=legendLabel[rv])
 plt.xlabel('Water Volume (in^3)')
 plt.ylabel('$\Delta u$ (in)')
 plt.ylim([-1*inch,0])
-plt.xlim([0,max_volume])
+#plt.xlim([0,max_volume])
 plt.legend(loc='lower left')
 plt.grid()
-plt.show()
+#plt.show()
 
 
 plt.figure()
