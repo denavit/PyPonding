@@ -11,6 +11,8 @@ from PyPonding.PondingLoadCell import PondingLoadCell2d
 import numpy as np
 import matplotlib.pyplot as plt
 
+from wide_flange import wf,wf_shapes
+
 class PondingLoadCell2d_OPS(PondingLoadCell2d):
     def __init__(self,id,nodeI,nodeJ,gamma,tw):
         self.id = id
@@ -33,52 +35,7 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
         self.dyJ = ops.nodeDisp(self.nodeJ,2)
         
 
-class wf:
-    def __init__(self,d,tw,bf,tf,Fy,E,Hk):
-        self.d  = d
-        self.tw = tw
-        self.bf = bf
-        self.tf = tf
-        self.Fy = Fy
-        self.E  = E
-        self.Hk = Hk
-        self.material_type = 'ElasticPP'
-        self.num_fiber = 20
-        
-    def dw(self):
-        dw = self.d-2*self.tf
-        return dw
-    
-    def A(self):
-        A = 2*self.bf*self.tf + (self.d-2*self.tf)*self.tw
-        return A
-    
-    def Iz(self):
-        Iz = (1.0/12)*self.bf*self.d**3 - (1.0/12)*(self.bf-self.tw)*self.dw()**3
-        return Iz
-        
-    def define_fiber_section(self,secTag,matTag):
-        if self.material_type == 'Elastic':
-            ops.uniaxialMaterial('Elastic', matTag, self.E)
-        elif self.material_type == 'ElasticPP':
-            # ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E)
-            b = self.Hk/(self.E+self.Hk)
-            #ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, b)
-            ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, self.Hk)
-        else:
-            raise Exception('Input Error - unknown material type (%s)' % self.material_type)
-        #ops.section('Fiber', secTag)
-        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, self.dw()/2, -self.bf/2, self.d/2, self.bf/2)
-        #numSubdivY = ceil(self.dw()*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, -self.dw()/2, -self.tw/2, self.dw()/2, self.tw/2)
-        #numSubdivY = ceil(self.tf*(self.num_fiber/self.d))
-        #ops.patch('rect', matTag, numSubdivY, 1, -self.d/2, -self.bf/2, -self.dw()/2, self.bf/2)
-        
-        Nfw = ceil(self.dw()*(self.num_fiber/self.d))
-        Nff = ceil(self.tf*(self.num_fiber/self.d))
-        ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,Nfw,Nff)
-        return
+
   
 
 nsteps = 100
@@ -86,6 +43,7 @@ nsteps = 250
 
 material_type = 'Elastic'
 material_type = 'ElasticPP'
+material_type = 'Hardening'
 
 inch = 1.0
 kip = 1.0
@@ -126,11 +84,11 @@ wf_section.material_type = material_type
 # print(wf_section.A()) # 4.43 from the Steel Manual
 # print(wf_section.Iz()) # 29.1 from the Steel Manual
 
-L       = 45*ft # span length
+L       = 30*ft # span length
 A       = wf_section.A()
 Iz      = wf_section.Iz()
 gamma   = 62.4*pcf
-tw      = 5*ft # tributary width
+tw      = 10*ft # tributary width
 zi      = 0.0*inch
 # Max water height below hFail is failure
 zj      = 0*inch;     hFail = 4.9*inch
@@ -143,7 +101,11 @@ rate = 3.75*inch/hr
 cd = 0.6
 
 # Scupper width
-b = 12*inch
+ws = 6*inch
+# Scupper spacing
+Ss = 40*ft
+# Tributary area per scupper
+As = Ss*L
 
 # Static head
 ds = 2*inch
@@ -153,7 +115,21 @@ qD = 20.0*psf # dead load
 wD = qD*tw # Dead load per length
 
 Atrib = L*tw
-max_volume = (15*inch)*Atrib
+wf_section.gamma    = gamma
+wf_section.TW    = tw
+wf_section.wD    = wD
+wf_section.L = L
+wf_section.zi = zi
+wf_section.zj = zj
+
+# Set design method and compute zw_lim (ds+dh)
+#method = 'AISC Appendix 2'
+#method = 'DAMP'
+method = 'Proposed for ASCE 7'
+
+
+
+max_volume = (30*inch)*Atrib
 print(max_volume)
 
 nsteps_vol = 30
@@ -197,7 +173,7 @@ ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
 ops.randomVariable(4,'normal','-mean',tweb,'-stdv',0.02*tweb)
 ops.randomVariable(5,'normal','-mean',bf,'-stdv',0.02*bf)
 ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
-ops.randomVariable(7,'normal','-mean',-wD,'-stdv',-0.1*wD)
+ops.randomVariable(7,'normal','-mean',-wD,'-stdv',0.1*wD)
 ops.randomVariable(8,'lognormal','-mean',Hk,'-stdv',0.05*Hk)
 
 ops.probabilityTransformation('Nataf')
@@ -333,13 +309,24 @@ for j in range(Ntrials+1):
         PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
 
+    # 1 Fy, 2 E, 3 d, 4 tweb, 5 bf, 6 tf, 7 wD, 8 Hk
+    wf_section.Fy = x[0]
+    wf_section.E = x[1]
+    wf_section.d = x[2]
+    wf_section.tw = x[3]
+    wf_section.bf = x[4]
+    wf_section.tf = x[5]
+    wf_section.wD = -x[6] # Should be positive for wf_section
+    wf_section.Hk = x[7]
+    zw_lim = wf_section.maximum_permitted_zw(method)
+
     rate = x[rateRVTag-1]
-    q = rate*Atrib
-    max_volume = q*(15*minute)
-    print(max_volume)
-    vol_tol = max_volume/nsteps/100.0
+    cd = x[cdRVTag-1]
     
-    dh = (1.5*q/(cd*b*(2*g)**0.5))**(2.0/3)
+    q = rate*As
+    dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
+    
+    ds = zw_lim-dh
     hFail = dh+ds
     
     # ------------------------------
@@ -410,6 +397,7 @@ for j in range(Ntrials+1):
         if j == Ntrials:
             meanPlot[iStep+1,0] = target_volume
             meanPlot[iStep+1,1] = zw
+            meanhFail = hFail
             for rv in ops.getRVTags():
                 cov = ops.getStdv(rv)/ops.getMean(rv)
                 # Negative sign because disp is downward
@@ -433,6 +421,7 @@ for j in range(Ntrials+1):
             end_step = iStep+1
             break        
 
+    print(hFail)
     if j < Ntrials and max(data_height) <= hFail:
         Nfailed = Nfailed+1
 
@@ -456,17 +445,19 @@ for j in range(Ntrials+1):
     #print(zw,end_step)
     # Show plot
     plt.plot(data_volume[:end_step+1], data_height[:end_step+1],'y',linewidth=0.5)
-    #plt.plot(data_volume, data_height)
+    plt.plot([0,max_volume],[hFail,hFail],'k:',linewidth=0.5)
 
 pf = 1.0*Nfailed/Ntrials
-print('Probability of failure at less than %.1f inch water height is %.3f\n' % (hFail,pf))
+print('Probability of failure is %.3f\n' % (pf))
 
 plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
-plt.plot([0,max_volume],[hFail,hFail],'k:')
+#plt.plot([0,max_volume],[hFail,hFail],'k:')
+print(hFail)
 plt.plot(meanPlot[:end_step+1,0],meanPlot[:end_step+1,1],'k',linewidth=2)
+plt.plot([0,max_volume],[meanhFail,meanhFail],'k',linewidth=2)
 plt.xlabel('Water Volume (in^3)')
 plt.ylabel('Water Height (in)')
-plt.ylim([-10*inch,15*inch])
+plt.ylim([-5*inch,20*inch])
 #plt.xlim([0,max_volume])
 plt.grid()
 #plt.show()
