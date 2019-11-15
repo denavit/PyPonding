@@ -107,9 +107,6 @@ Ss = 40*ft
 # Tributary area per scupper
 As = Ss*L
 
-# Static head
-ds = 2*inch
-
 qD = 20.0*psf # dead load
 #qD = 0.01*psf
 wD = qD*tw # Dead load per length
@@ -122,12 +119,16 @@ wf_section.L = L
 wf_section.zi = zi
 wf_section.zj = zj
 
+# Nominal value for static head
+q = rate*As
+dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
+
+methods = ['AISC Appendix 2','DAMP','Proposed for ASCE 7']
+ds = {}
 # Set design method and compute zw_lim (ds+dh)
-#method = 'AISC Appendix 2'
-#method = 'DAMP'
-method = 'Proposed for ASCE 7'
-
-
+for method in methods:
+    zw_lim = wf_section.maximum_permitted_zw(method)
+    ds[method] = zw_lim - dh
 
 max_volume = (30*inch)*Atrib
 print(max_volume)
@@ -263,16 +264,20 @@ u = np.zeros(Nrv)
 
 # Number of Monte Carlo trials
 Ntrials = 1000
-Ntrials = 100
+Ntrials = 10000
 
 # Number of failed MC trials
-Nfailed = 0
+Nfailed = {}
+for method in methods:
+    Nfailed[method] = 0
 
 duPlot = np.zeros((nsteps+1,Nparam))
 meanPlot = np.zeros((nsteps+1,2))
 
 plt.figure(1)
 plt.subplot(2,1,1)
+
+dh = np.zeros(Ntrials+1)
 
 for j in range(Ntrials+1):
 
@@ -309,25 +314,14 @@ for j in range(Ntrials+1):
         PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
 
-    # 1 Fy, 2 E, 3 d, 4 tweb, 5 bf, 6 tf, 7 wD, 8 Hk
-    wf_section.Fy = x[0]
-    wf_section.E = x[1]
-    wf_section.d = x[2]
-    wf_section.tw = x[3]
-    wf_section.bf = x[4]
-    wf_section.tf = x[5]
-    wf_section.wD = -x[6] # Should be positive for wf_section
-    wf_section.Hk = x[7]
-    zw_lim = wf_section.maximum_permitted_zw(method)
-
     rate = x[rateRVTag-1]
     cd = x[cdRVTag-1]
     
     q = rate*As
-    dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
-    
-    ds = zw_lim-dh
-    hFail = dh+ds
+    dh[j] = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
+    hFail = {}
+    for method in methods:
+        hFail[method] = dh[j]+ds[method]
     
     # ------------------------------
     # Finally perform the analysis
@@ -421,9 +415,10 @@ for j in range(Ntrials+1):
             end_step = iStep+1
             break        
 
-    print(hFail)
-    if j < Ntrials and max(data_height) <= hFail:
-        Nfailed = Nfailed+1
+    for method in methods:
+        #print(hFail[method])
+        if j < Ntrials and max(data_height) <= hFail[method]:
+            Nfailed[method] += 1
 
     # Remove patterns so there's not
     # duplicate tag errors in MC loop
@@ -442,13 +437,16 @@ for j in range(Ntrials+1):
     #print('OpenSees:    %.5f' % uy)
     #print('Percent Diff %.2f%%' % (100*(uy-delta)/delta))
 
-    #print(zw,end_step)
     # Show plot
-    plt.plot(data_volume[:end_step+1], data_height[:end_step+1],'y',linewidth=0.5)
-    plt.plot([0,max_volume],[hFail,hFail],'k:',linewidth=0.5)
+    #plt.plot(data_volume[:end_step+1], data_height[:end_step+1],'y',linewidth=0.5)
+    #plt.plot([0,max_volume],[hFail,hFail],'k:',linewidth=0.5)
 
-pf = 1.0*Nfailed/Ntrials
-print('Probability of failure is %.3f\n' % (pf))
+pf = {}
+for method in methods:
+    pf[method] = 1.0*Nfailed[method]/Ntrials
+    print('Probability of failure for %s is %.4f\n' % (method,pf[method]))
+
+exit()
 
 plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
 #plt.plot([0,max_volume],[hFail,hFail],'k:')
