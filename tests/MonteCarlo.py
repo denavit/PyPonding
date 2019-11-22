@@ -238,7 +238,7 @@ legendLabel = {
 # ------------------------------
 
 # create SOE
-ops.system("UmfPack")
+ops.system("SparseGeneral")
 
 # create DOF number
 ops.numberer("RCM")
@@ -266,18 +266,16 @@ u = np.zeros(Nrv)
 Ntrials = 1000
 Ntrials = 10000
 
-# Number of failed MC trials
-Nfailed = {}
-for method in methods:
-    Nfailed[method] = 0
-
 duPlot = np.zeros((nsteps+1,Nparam))
 meanPlot = np.zeros((nsteps+1,2))
 
 plt.figure(1)
 plt.subplot(2,1,1)
 
-dh = np.zeros(Ntrials+1)
+output = open('trials.csv','w')
+for method in methods:
+    output.write('ds %s,' % method)
+output.write('dh,dmax\n')
 
 for j in range(Ntrials+1):
 
@@ -318,10 +316,10 @@ for j in range(Ntrials+1):
     cd = x[cdRVTag-1]
     
     q = rate*As
-    dh[j] = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
-    hFail = {}
+    dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
     for method in methods:
-        hFail[method] = dh[j]+ds[method]
+        output.write('%g,' % ds[method])
+    output.write('%g,' % dh)
     
     # ------------------------------
     # Finally perform the analysis
@@ -415,11 +413,9 @@ for j in range(Ntrials+1):
             end_step = iStep+1
             break        
 
-    for method in methods:
-        #print(hFail[method])
-        if j < Ntrials and max(data_height) <= hFail[method]:
-            Nfailed[method] += 1
-
+    output.write('%g' % max(data_height))
+    output.write('\n')
+    
     # Remove patterns so there's not
     # duplicate tag errors in MC loop
     for iStep in range(nsteps):
@@ -441,11 +437,8 @@ for j in range(Ntrials+1):
     #plt.plot(data_volume[:end_step+1], data_height[:end_step+1],'y',linewidth=0.5)
     #plt.plot([0,max_volume],[hFail,hFail],'k:',linewidth=0.5)
 
-pf = {}
-for method in methods:
-    pf[method] = 1.0*Nfailed[method]/Ntrials
-    print('Probability of failure for %s is %.4f\n' % (method,pf[method]))
-
+output.close()
+    
 exit()
 
 plt.title('W14x22, L=%.1f ft, zj=%.2f in -- Pf=%.3f' % (L/ft,zj,pf))
