@@ -103,7 +103,7 @@ class Model:
         return (V,dVdz)
  
     def SolveForDisp(self,K,f):
-        # identidy free dofs and equal dof constraints
+        # identify free dofs and equal dof constraints
         free_dofs = list()
         dof_map = dict()
         equal_dof_constraints = dict()
