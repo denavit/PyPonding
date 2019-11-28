@@ -1,6 +1,4 @@
-#import sys
-#sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
-from PyPonding.structures.steel_beam import steel_beam
+from PyPonding.structures import steel_beam
 from PyPonding import FE
 from math import pi, cos, cosh
 import numpy as np
@@ -21,7 +19,7 @@ I       = 75*inch**4   # Moment of inertia
 
 L       = 40*ft         # Beam span
 TW      = 5*ft          # Tributary width
-c       = 2*inch        # Camber
+c       = 0*inch        # Camber
 
 qD      = 0.0*psf      # Dead load (force per area)
 gamma   = 62.4*pcf      # Unit weight of water
@@ -60,6 +58,7 @@ beam.BuildModel();
 
 # Run Ponding Analysis
 PA = FE.PondingAnalysis(beam.model,'Constant_Level')
+PA.output_level = 1
 PA.max_iterations_z = 60
 res = PA.run({'DEAD':1.0},zw)
 if res != 0:
