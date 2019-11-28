@@ -615,7 +615,10 @@ class PondingAnalysis:
             # Iterate
             for i in range(self.max_iterations_z):
                 d_last = d
-                f = f_nodal + self.model.GetPondingForceVector(d,z)
+                f_ponding = self.model.GetPondingForceVector(d,z)
+                if self.output_level > 0:
+                    print('Iteration %3i, Total Ponding Load = %.6f' % (i,-np.sum(f_ponding)))
+                f = f_nodal + f_ponding
                 
                 if self.use_stored_analysis:
                     (d,r) = self.model.SolveForDispWithStored(f)
