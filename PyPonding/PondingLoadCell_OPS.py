@@ -1,5 +1,13 @@
 from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
-import openseespy.opensees as ops
+try:
+    import opensees as ops
+except ImportError:
+    try:
+        import openseespy.opensees as ops
+    except ImportError:
+        import warnings
+        warnings.warn('OpenSeesPy not found. OpenSees functionality is not available.')
+
 
 class PondingLoadCell2d_OPS(PondingLoadCell2d):
     def __init__(self,id,nodeI,nodeJ,gamma,tw):
