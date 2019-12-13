@@ -1,8 +1,7 @@
-#import sys
-#sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
-from PyPonding.structures.steel_beam import steel_beam
+from PyPonding.structures import steel_beam
 from PyPonding import FE
 from math import pi, cos, cosh
+import numpy as np
 
 # Define units
 inch    = 1.0
@@ -20,7 +19,7 @@ I       = 75*inch**4   # Moment of inertia
 
 L       = 40*ft         # Beam span
 TW      = 5*ft          # Tributary width
-c       = 2*inch        # Camber
+c       = 0*inch        # Camber
 
 qD      = 0.0*psf      # Dead load (force per area)
 gamma   = 62.4*pcf      # Unit weight of water
@@ -59,12 +58,16 @@ beam.BuildModel();
 
 # Run Ponding Analysis
 PA = FE.PondingAnalysis(beam.model,'Constant_Level')
+PA.output_level = 1
 PA.max_iterations_z = 60
 res = PA.run({'DEAD':1.0},zw)
 if res != 0:
     print('Not converged')
 Vmax = beam.Maximum_Shear(PA)
 Mmax = beam.Maximum_Moment(PA)
+(x,M,V) = beam.Moment_and_Shear(PA)
+x_at_Mmax = x[np.argmax(np.absolute(M))]
+
 
 # Run First-Order Analysis
 PAo = FE.PondingAnalysis(beam.model,'No_Ponding_Effect')
@@ -73,17 +76,19 @@ if res != 0:
     print('Not converged')
 Vmaxo = beam.Maximum_Shear(PAo)    
 Mmaxo = beam.Maximum_Moment(PAo)
+(x,M,V) = beam.Moment_and_Shear(PAo)
+x_at_Mmaxo = x[np.argmax(np.absolute(M))]
+
 
 # Print Results
 Cs = (gamma*TW*L**4)/(pi**4*E*I)
-print('Cs = %.3f' % Cs)
+print('\nCs = %.3f' % Cs)
 print('Basic Amplification 1/(1-Cs) = %.3f' % (1/(1-Cs)))
 x = pi/2*Cs**0.25
-print('More Exact Amplification     = %.3f' % ((1/cos(x)-1/cosh(x))/x**2)) # from Silver (2010)
-print('Max. Shear (with ponding)    = %.3f kip' % (Vmax))
-print('Max. Shear (no ponding)      = %.3f kip' % (Vmaxo))
-print('Shear Amplification          = %.3f' % (Vmax/Vmaxo))
-print('Max. Moment (with ponding)   = %.3f kip-in' % (Mmax))
-print('Max. Moment (no ponding)     = %.3f kip-in' % (Mmaxo))
-print('Moment Amplification         = %.3f' % (Mmax/Mmaxo))
+print('More Exact Amplification     = %.3f\n' % ((1/cos(x)-1/cosh(x))/x**2)) # from Silver (2010)
+print('                      with ponding           no ponding          amplification')
+print('Max Shear           %9.3f kip         %9.3f kip          %9.3f' % (Vmax,Vmaxo,Vmax/Vmaxo))
+print('Max Moment          %9.3f kip-in      %9.3f kip-in       %9.3f' % (Mmax,Mmaxo,Mmax/Mmaxo))
+print('Pos. of Mmax      %5.1f in (%4.3f*L)    %5.1f in (%4.3f*L)\n' % (x_at_Mmax,x_at_Mmax/L,x_at_Mmaxo,x_at_Mmaxo/L))
+
 
