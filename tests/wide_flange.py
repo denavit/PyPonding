@@ -27,6 +27,8 @@ class wf:
         
         self.L  = float('nan')  # Beam length (span)
         self.TW = float('nan')  # Tributary width
+        self.gamma = 0.0
+        
         self.zi = 0.0
         self.zj = 0.0
         self.c  = 0.0           # Camber
