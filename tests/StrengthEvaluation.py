@@ -1,4 +1,8 @@
-import openseespy.opensees as ops
+#import openseespy.opensees as ops
+import sys
+sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
+import opensees as ops
+
 from math import pi,cos,cosh,ceil
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,6 +38,9 @@ list_spans_and_sections = [
 list_slope = [0.0*in_per_ft,0.25*in_per_ft,0.5*in_per_ft,1.0*in_per_ft]
 list_qD = [10.0*psf,20.0*psf,30.0*psf]
 
+
+makePlots = False
+dumpData = False
 
 # Run Analysis
 f = open('StrengthEvaluationOutput.csv','w')
@@ -72,7 +79,23 @@ for span_and_section in list_spans_and_sections:
             (data_volume,data_height) = wf_section.perform_OpenSees_analysis();
             zmax_inelastic = np.max(data_height)
 
+            if makePlots:
+                plt.figure()
+                plt.plot(data_volume/1000,data_height,'-k')
+                plt.xlabel('Volume (1000 in^3)')
+                plt.ylabel('Height (in)')
+                plt.title('%s, L=%d ft, slope=%d in/ft, qD=%d psf' % (shape_name,L/ft,slope/in_per_ft,qD/psf))
+                plt.xlim(left=0)
+                plt.grid()
+                plt.savefig('HV_%s_%d_%.2f_%d.pdf' % (shape_name,L/ft,slope/in_per_ft,qD/psf))
 
+            if dumpData:
+                m = len(data_volume)
+                output = open('HV_%s_%d_%.2f_%d.txt' % (shape_name,L/ft,slope/in_per_ft,qD/psf),'w')
+                for ii in range(m):
+                    output.write('%g %g\n' % (data_volume[ii],data_height[ii]))
+                output.close()
+            
             # Elastic Analyses
             elastic_beam = wf_section.steel_beam_object()
             
@@ -87,4 +110,7 @@ for span_and_section in list_spans_and_sections:
             
             # Print Data
             f.write('%s,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (shape_name,L/ft,slope/in_per_ft,qD/psf,zmax_inelastic,zmax_elastic,tau,zmax_elastic_reduced))
+
 f.close()
+
+
