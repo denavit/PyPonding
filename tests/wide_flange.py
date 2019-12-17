@@ -160,7 +160,8 @@ class wf:
         
         # define elements
         for i in range(0,self.num_elements):
-            ops.element("forceBeamColumn",i,i,i+1,1,1)
+            #ops.element("forceBeamColumn",i,i,i+1,1,1)
+            ops.element("dispBeamColumn",i,i,i+1,1,1)            
         
         # Dead load
         ops.pattern('Plain',-1,1)
