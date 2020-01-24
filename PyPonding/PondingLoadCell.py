@@ -28,7 +28,10 @@ class PondingLoadCell2d:
         hJ = z - (self.yJ + self.dyJ)
         
         if hI >= 0:
-            if hJ >= 0:
+            if hJ == 0:
+                F = 0
+                x = 0.5*L
+            elif hJ > 0:
                 F  = -self.gamma*self.tw*(hI+hJ)*L/2
                 x  = L*(2*hJ+hI)/(3*(hI+hJ))
             else:
