@@ -44,7 +44,7 @@ dumpData = False
 
 # Run Analysis
 f = open('StrengthEvaluationOutput.csv','w')
-f.write('shape_name,L (ft),slope (in/ft),dead load (psf),zmax_inelastic,zmax_elastic,tau,zmax_elastic_reduced\n')
+f.write('shape_name,L (ft),slope (in/ft),dead load (psf),zmax_inelastic,zmax_inelastic_noRS,zmax_elastic,tau,zmax_elastic_reduced\n')
 for span_and_section in list_spans_and_sections:
     L = span_and_section[0]
     shape_name = span_and_section[1]
@@ -62,6 +62,7 @@ for span_and_section in list_spans_and_sections:
             wf_section = wf(d,tw,bf,tf,Fy,E,Hk)
 
             # Set additional properties
+            wf_section.frc      = -0.3*Fy
             wf_section.L        = L 
             wf_section.gamma    = 62.4*pcf
             wf_section.TW       = TW
@@ -96,6 +97,11 @@ for span_and_section in list_spans_and_sections:
                     output.write('%g %g\n' % (data_volume[ii],data_height[ii]))
                 output.close()
             
+            # Run OpenSees analysis without residual stress
+            wf_section.frc = 0.0
+            (data_volume,data_height) = wf_section.perform_OpenSees_analysis();
+            zmax_inelastic_noRS = np.max(data_height)            
+            
             # Elastic Analyses
             elastic_beam = wf_section.steel_beam_object()
             
@@ -109,7 +115,7 @@ for span_and_section in list_spans_and_sections:
             zmax_elastic_reduced = elastic_beam.Run_To_Strength_Limit(start_level = 1.0,max_level=500.0)
             
             # Print Data
-            f.write('%s,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (shape_name,L/ft,slope/in_per_ft,qD/psf,zmax_inelastic,zmax_elastic,tau,zmax_elastic_reduced))
+            f.write('%s,%i,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (shape_name,L/ft,slope/in_per_ft,qD/psf,zmax_inelastic,zmax_inelastic_noRS,zmax_elastic,tau,zmax_elastic_reduced))
 
 f.close()
 
