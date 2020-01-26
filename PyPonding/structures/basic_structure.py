@@ -22,9 +22,9 @@ class basic_structure:
         if start_level is None:
             start_level = self.lowest_point()
         if max_level is None:
-            max_level = start_level + 36
+            max_level = start_level + 240
         if min_level is None:
-            min_level = start_level - 18
+            min_level = start_level - 48
         
         self.BuildModel();
         self.model.use_sparse_matrix_solver = use_sparse
