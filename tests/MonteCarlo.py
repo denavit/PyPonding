@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text',usetex=True)
+rc('font',family='serif')
 
 from wide_flange import wf,wf_shapes
 
@@ -42,6 +43,7 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
 
 nsteps = 100
 nsteps = 250
+nsteps = 3000
 
 material_type = 'Elastic'
 material_type = 'ElasticPP'
@@ -60,7 +62,7 @@ ksi = kip/inch**2
 psf = lb/ft**2
 pcf = psf/ft
 
-g = 386.4*inch**2/sec
+g = 386.4*inch/sec**2
 gamma   = 62.4*pcf
 
 gal = 0.133681*ft**3
@@ -70,6 +72,7 @@ Fy = 50.0*ksi # yield stress
 E = 29000.0*ksi # elastic modulus
 Hk = 29.0*ksi # kinematic hardening modulus
 Fr = 0.2*Fy # residual stress
+Fr = 0.0
 
 # Hourly rainfall rate (in/hr)
 rate = 3.75*inch/hr
@@ -104,8 +107,13 @@ list_qD = [10.0*psf,20.0*psf,30.0*psf]
 # Number of Monte Carlo trials
 Ntrials = 1000
 Ntrials = 100
-Ntrials = 1
+#Ntrials = 50
+Ntrials = 2
 
+exec(open('doPondingAnalysis.py').read())
+
+shell = open('pondingShell.sh','w')
+shell.write('#!/bin/sh\n')
 
 icase = 0
 # Run Analysis
@@ -119,7 +127,7 @@ for span_and_section in list_spans_and_sections:
     d = wfs['d']*inch
     tweb = wfs['tw']*inch
     bf = wfs['bf']*inch
-    tf = wfs['tw']*inch
+    tf = wfs['tf']*inch
     for slope in list_slope:
         zi      = 0.0*inch
         zj      = slope*L
@@ -130,7 +138,13 @@ for span_and_section in list_spans_and_sections:
 
             print(icase,shape_name,L,slope,qD)
 
-
+            caseFile = open(f'ponding{icase}.py','w')
+            caseFile.write('exec(open(\'doPondingAnalysis.py\').read())\n')
+            caseFile.write(f'doPondingAnalysis(\'{shape_name}\',{L},{slope},{qD},{icase})\n')
+            caseFile.close()
+            shell.write(f'python3 ponding{icase}.py\n')
+            #doPondingAnalysis(shape_name,L,slope,qD,icase)
+            continue
 
 
 
@@ -161,12 +175,13 @@ for span_and_section in list_spans_and_sections:
 
             methods = ['AISC Appendix 2','DAMP','Proposed for ASCE 7','Neglect Ponding']
             ds = {}
+            zw_lim = {}
             # Set design method and compute zw_lim (ds+dh)
             for method in methods:
-                zw_lim = wf_section.maximum_permitted_zw(method)
-                ds[method] = zw_lim - dh
+                zw_lim[method] = wf_section.maximum_permitted_zw(method)
+                ds[method] = zw_lim[method] - dh
 
-            max_volume = (30*inch)*Atrib
+            max_volume = (300*inch)*Atrib
 
             nsteps_vol = 30
             nele = 20
@@ -232,7 +247,6 @@ for span_and_section in list_spans_and_sections:
             eulergamma = 0.57721566490153286061
             scale = (rate-perc95)/(log(-log(0.95))+eulergamma)
             loc = rate - scale*eulergamma
-            print('stdev?? = ',pi/(scale*6**.5))
             #ops.randomVariable(rateRVTag,'type1LargestValue','-parameters',loc,scale)
             ops.randomVariable(rateRVTag,'type1LargestValue','-mean',rate,'-stdv',(scale*6**0.5)/pi)
             ops.parameter(rateRVTag)
@@ -300,7 +314,7 @@ for span_and_section in list_spans_and_sections:
             ops.test('NormUnbalance',1.0e-6,20,0)
             
             # create algorithm
-            ops.algorithm("KrylovNewton")
+            ops.algorithm("Newton")
     
             ops.probabilityTransformation('Nataf')
     
@@ -319,6 +333,7 @@ for span_and_section in list_spans_and_sections:
             #plt.subplot(2,1,1)
 
             output = open(f'trials{icase}.csv','w')
+            output.write(f'{shape_name}, L = {L} in, slope = {slope} in/in, dead load = {qD} kip/in^2\n')
             for method in methods:
                 output.write('ds %s,' % method)
             output.write('dh,dmax\n')
@@ -332,14 +347,14 @@ for span_and_section in list_spans_and_sections:
                 jj = 0
                 for rv in ops.getRVTags():
                     u[jj] = norm.ppf(np.random.rand())
-                    if j == Ntrials:
-                        u[jj] = 0
+                    if j == Ntrials: 
+                        u[jj] = 0 # mean realizations
                     jj = jj+1
 
                 # 2. Transform to real space
                 x = ops.transformUtoX(*u)
                 #print(j,x)
-                print(j)
+                print(j,icase)
                 # 3. Update parameters with random realizations
                 jj = 0
                 for rv in ops.getRVTags():
@@ -381,7 +396,8 @@ for span_and_section in list_spans_and_sections:
         
 
                 if j == Ntrials:
-                    ops.sensitivityAlgorithm('-computeAtEachStep')
+                    meanHV = open(f'meanHV{icase}.csv','w')
+                    #ops.sensitivityAlgorithm('-computeAtEachStep')
             
                 # Perform analysis, ramping up volume      
                 zw = 0.1
@@ -423,34 +439,36 @@ for span_and_section in list_spans_and_sections:
 
                     # Run analysis
                     ok = ops.analyze(1)
-
+                    if ok < 0:
+                        print(target_volume,max_volume,zw)
+                        
                     # Store Data
                     data_volume[iStep+1] = target_volume
                     data_height[iStep+1] = zw
-
                     if j == Ntrials:
                         meanPlot[iStep+1,0] = target_volume
                         meanPlot[iStep+1,1] = zw
+                        meanHV.write(f'{target_volume},{zw}\n')
                         meanhFail = {}
                         for method in methods:
                             meanhFail[method] = dh + ds[method]
                         for rv in ops.getRVTags():
                             cov = ops.getStdv(rv)/ops.getMean(rv)
                             # Negative sign because disp is downward
-                            duPlot[iStep+1,rv-1] = -ops.sensNodeDisp(mid_node,2,rv)*abs(ops.getStdv(rv))
+                            #duPlot[iStep+1,rv-1] = -ops.sensNodeDisp(mid_node,2,rv)*abs(ops.getStdv(rv))
 
-                        ix = 0
-                        for e in range(nele):
-                            [I,J] = ops.eleNodes(e)
-                            XI = ops.nodeCoord(I,'X')
-                            XJ = ops.nodeCoord(J,'X')
-                            Lele = XJ-XI
-                            for ip in range(Np):
-                                x = ops.sectionLocation(e,ip+1)
-                                EIplot[ix,0] = XI + x
-                                ks = ops.sectionStiffness(e,ip+1)
-                                EIplot[ix,iStep+1] = ks[3]
-                                ix = ix+1
+#                        ix = 0
+#                        for e in range(nele):
+#                            [I,J] = ops.eleNodes(e)
+#                            XI = ops.nodeCoord(I,'X')
+#                            XJ = ops.nodeCoord(J,'X')
+#                            Lele = XJ-XI
+#                            for ip in range(Np):
+#                                x = ops.sectionLocation(e,ip+1)
+#                                EIplot[ix,0] = XI + x
+#                                ks = ops.sectionStiffness(e,ip+1)
+#                                EIplot[ix,iStep+1] = ks[3]
+#                                ix = ix+1
 
                     # Stop analysis if water level too low or analysis failed
                     if zw <= -4*inch or ok < 0:
@@ -460,6 +478,9 @@ for span_and_section in list_spans_and_sections:
                 output.write('%g' % max(data_height))
                 output.write('\n')
 
+                if j == Ntrials:
+                    meanHV.close()
+                
                 # Remove patterns so there's not
                 # duplicate tag errors in MC loop
                 for iStep in range(nsteps):
@@ -487,6 +508,8 @@ for span_and_section in list_spans_and_sections:
             ops.wipeReliability()
 
 
+shell.close()
+            
 exit()
 
 
