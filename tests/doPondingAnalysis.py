@@ -51,7 +51,7 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     
     g = 386.4*inch/sec**2
     gamma   = 62.4*pcf
-    
+
     gal = 0.133681*ft**3
 
 
@@ -63,14 +63,18 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     E = 29000.0*ksi # elastic modulus
     Hk = 29.0*ksi # kinematic hardening modulus
     Fr = 0.2*Fy # residual stress
-    #Fr = 0.0
+    Fr = 0.001*Fy
     
     # Hourly rainfall rate (in/hr)
-    rate = 3.75*inch/hr
-    
-    rate = 1.26*inch/(0.25*hr)
-    perc95 = 1.72*inch/(0.25*hr)
-    
+    locations = ['Denver','New York','New Orleans']
+    rate = {}
+    perc95 = {}
+    rate['Denver'] = 1.26*inch/(0.25*hr)
+    perc95['Denver'] = 1.72*inch/(0.25*hr)
+    rate['New York'] = 1.67*inch/(0.25*hr)
+    perc95['New York'] = 2.33*inch/(0.25*hr)
+    rate['New Orleans'] = 2.33*inch/(0.25*hr)
+    perc95['New Orleans'] = 3.11*inch/(0.25*hr)
     
     # "Drag coefficient" in scupper flow equation
     cd = 0.6
@@ -89,14 +93,13 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     nsteps = 100
     nsteps = 250
     nsteps = 3000
-    #nsteps = 1000
+    nsteps = 1000
     
     # Number of Monte Carlo trials
     Ntrials = 1000
     #Ntrials = 200
-    #Ntrials = 99
-    #Ntrials = 2
-
+    Ntrials = 99
+    Ntrials = 1
 
     # From function input
     wfs = wf_shapes[shape_name]
@@ -104,8 +107,9 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     tweb = wfs['tw']*inch
     bf = wfs['bf']*inch
     tf = wfs['tf']*inch
-
-    wf_section = wf(d,tweb,bf,tf,Fy,E,Hk) # W6x15
+    dw = d-2*tf
+    
+    wf_section = wf(d,tweb,bf,tf,Fy,E,Hk)
     wf_section.material_type = material_type
 
     A  = wf_section.A()
@@ -131,8 +135,10 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
 
     # Nominal value for static head
     As = Ss*L
-    q = rate*As
-    dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
+    dhnom = {}
+    for city in locations:
+        q = rate[city]*As
+        dhnom[city] = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
     
     methods = ['AISC Appendix 2','DAMP','Proposed for ASCE 7','Neglect Ponding']
     ds = {}
@@ -140,7 +146,7 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     # Set design method and compute zw_lim (ds+dh)
     for method in methods:
         zw_lim[method] = wf_section.maximum_permitted_zw(method)
-        ds[method] = zw_lim[method] - dh
+        #ds[method] = zw_lim[method] - dh # Now computed in ReadMonteCarlo.py
 
     max_volume = (300*inch)*Atrib
 
@@ -182,48 +188,38 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     ops.pattern('Plain',-1,1)
 
     
-    ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy)
-    ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E)
-    ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
-    ops.randomVariable(4,'normal','-mean',tweb,'-stdv',0.02*tweb)
-    ops.randomVariable(5,'normal','-mean',bf,'-stdv',0.02*bf)
-    ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
-    ops.randomVariable(7,'normal','-mean',-wD,'-stdv',0.1*wD)
-    #ops.randomVariable(8,'lognormal','-mean',Hk,'-stdv',0.05*Hk)
-    ops.randomVariable(8,'lognormal','-mean',Fr,'-stdv',0.15*Fr)
+    ops.randomVariable(1,'lognormal','-mean',Fy,'-stdv',0.1*Fy); ops.parameter(1)
+    ops.randomVariable(2,'lognormal','-mean', E,'-stdv',0.02*E); ops.parameter(2)
+    ops.randomVariable(3,'normal','-mean',-wD,'-stdv',0.1*wD); ops.parameter(3)
+    ops.randomVariable(4,'lognormal','-mean',Fr,'-stdv',0.15*Fr); ops.parameter(4)
 
+    ops.parameter(8) # For the web
+    Nregions = wf_section.num_regions # Number of fibers in each flange
+    for i in range(Nregions):
+        ops.parameter(9+i)
+
+    
+    #ops.randomVariable(3,'normal','-mean',d,'-stdv',0.02*d)
+    #ops.randomVariable(4,'normal','-mean',tweb,'-stdv',0.02*tweb)
+    #ops.randomVariable(5,'normal','-mean',bf,'-stdv',0.02*bf)
+    #ops.randomVariable(6,'normal','-mean',tf,'-stdv',0.02*tf)
+    #ops.randomVariable(8,'lognormal','-mean',Hk,'-stdv',0.05*Hk)
+    
     ops.probabilityTransformation('Nataf')
 
-    ops.parameter(1)
-    ops.parameter(2)
-    ops.parameter(3)
-    ops.parameter(4)
-    ops.parameter(5)
-    ops.parameter(6)
-    ops.parameter(7)
-    ops.parameter(8)
-
-    rateRVTag = 9
-    #ops.randomVariable(rateRVTag,'lognormal','-mean',rate,'-stdv',0.2*rate)
-    eulergamma = 0.57721566490153286061
-    scale = (rate-perc95)/(log(-log(0.95))+eulergamma)
-    loc = rate - scale*eulergamma
-    #ops.randomVariable(rateRVTag,'type1LargestValue','-parameters',loc,scale)
-    ops.randomVariable(rateRVTag,'type1LargestValue','-mean',rate,'-stdv',(scale*6**0.5)/pi)
-    ops.parameter(rateRVTag)
-    ops.updateParameter(rateRVTag,rate)
-            
-    cdRVTag = 10
-    ops.randomVariable(cdRVTag,'normal','-mean',cd,'-stdv',0.02*cd)
-    ops.parameter(cdRVTag)
-    ops.updateParameter(cdRVTag,cd)
+    rateRVTag = 5
+    for city in locations:
+        #ops.randomVariable(rateRVTag,'lognormal','-mean',rate,'-stdv',0.2*rate)
+        eulergamma = 0.57721566490153286061
+        scale = (rate[city]-perc95[city])/(log(-log(0.95))+eulergamma)
+        loc = rate[city] - scale*eulergamma
+        #ops.randomVariable(rateRVTag,'type1LargestValue','-parameters',loc,scale)
+        ops.randomVariable(rateRVTag,'type1LargestValue','-mean',rate[city],'-stdv',(scale*6**0.5)/pi)
+        ops.parameter(rateRVTag)
+        ops.updateParameter(rateRVTag,rate[city])
+        rateRVTag += 1
     
-    #gammaRVTag = 9
-    #ops.randomVariable(gammaRVTag,'lognormal','-mean',gamma,'-stdv',0.1*gamma)
-    #ops.parameter(gammaRVTag)
-    #ops.updateParameter(gammaRVTag,gamma)
-
-
+    
     # define elements
     for i in range(nele):
         # ops.element("elasticBeamColumn",i,i,i+1,A,E,Iz,1)
@@ -231,15 +227,21 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
         ops.element("dispBeamColumn",i,i,i+1,1,1)
         ops.addToParameter(1,'element',i,'fy')
         ops.addToParameter(2,'element',i,'E')
+        ops.eleLoad('-ele',i,'-type','beamUniform',-wD)
+        ops.addToParameter(3,'loadPattern',-1,'elementLoad',i,'wy')
+        ops.addToParameter(6,'element',i,'material',1,'F0') # Web
+        for j in range(Nregions):
+            ops.addToParameter(7+j,'element',i,'material',1+2*(j+1),'F0') # Flange fibers
+
         #ops.addToParameter(3,'element',i,'d')
         #ops.addToParameter(4,'element',i,'tw')
         #ops.addToParameter(5,'element',i,'bf')
         #ops.addToParameter(6,'element',i,'tf')
         #ops.addToParameter(8,'element',i,'Hkin')
-        ops.addToParameter(8,'element',i,'F0')    
+
         
-        ops.eleLoad('-ele',i,'-type','beamUniform',-wD)
-        ops.addToParameter(7,'loadPattern',-1,'elementLoad',i,'wy')
+
+
 
     legendLabel = {
         #9: 'gamma',
@@ -296,11 +298,16 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     output = open(f'trials{label}.csv','w')
     output.write(f'{shape_name}, L = {L} in, slope = {slope} in/in, dead load = {qD} kip/in^2\n')
     for method in methods:
-        output.write('ds %s,' % method)
-    output.write('dh,dmax\n')
+        output.write(f'zwlim {method},')
+    for city in locations:
+        output.write(f'dhnom {city},')
+    for city in locations:
+        output.write(f'dh {city},')        
+    output.write('dmax\n')
 
     for j in range(Ntrials+1):
-
+        print(j,label)
+        
         ops.reset()
 
         # Transform random variables from standard normal to actual space
@@ -314,12 +321,19 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
 
         # 2. Transform to real space
         x = ops.transformUtoX(*u)
-        #print(j,x)
-        print(j,label)
+
         # 3. Update parameters with random realizations
         jj = 0
         for rv in ops.getRVTags():
-            ops.updateParameter(rv,x[jj])
+            if rv != 4:
+                ops.updateParameter(rv,x[jj])
+            else:
+                Frj = x[jj]
+                Frt = -Frj*(bf*tf)/(bf*tf+tw*dw)
+                ops.updateParameter(8,Frt)
+                for j in range(Nregions):
+                    Fri = Frj + (j+0.5)/Nregions*(Frt-Frj)
+                    ops.updateParameter(9+j,Fri)
             jj = jj+1
 
         # Dead load analysis
@@ -333,11 +347,16 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
         for i in range(nele):
             PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,gamma,tw)
 
-        q = x[rateRVTag-1]*As
-        dh = (1.5*q/(x[cdRVTag-1]*ws*(2*g)**0.5))**(2.0/3)
         for method in methods:
-            output.write('%g,' % ds[method])
-        output.write('%g,' % dh)
+            output.write(f'{zw_lim[method]},')
+        for city in locations:
+            output.write(f'{dhnom[city]},')
+        rateRVTag = 5
+        for city in locations:
+            q = x[rateRVTag-1]*As
+            dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
+            output.write(f'{dh},')
+            rateRVTag += 1
     
         # ------------------------------
         # Finally perform the analysis
@@ -410,9 +429,6 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
                 meanPlot[iStep+1,0] = target_volume
                 meanPlot[iStep+1,1] = zw
                 meanHV.write(f'{target_volume},{zw}\n')
-                meanhFail = {}
-                for method in methods:
-                    meanhFail[method] = dh + ds[method]
                 for rv in ops.getRVTags():
                     cov = ops.getStdv(rv)/ops.getMean(rv)
                     # Negative sign because disp is downward
@@ -424,7 +440,7 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
                 end_step = iStep+1
                 break        
 
-        output.write('%g' % max(data_height))
+        output.write(f'{max(data_height)}')
         output.write('\n')
 
         if j == Ntrials:
