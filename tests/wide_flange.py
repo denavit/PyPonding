@@ -13,6 +13,7 @@ from math import pi,ceil
 
 class wf:
     geomTransfType = 'Linear'
+    extra_results = False
 
     def __init__(self,d,tw,bf,tf,Fy,E,Hk):
         self.d  = d             # Depth
@@ -43,7 +44,7 @@ class wf:
         self.nsteps_vol = 30
         self.max_volume = float('nan')
         self.vol_tol = float('nan')
-        
+        self.percent_drop = 0.05
         
     def dw(self):
         dw = self.d-2*self.tf
@@ -68,6 +69,9 @@ class wf:
     def Mp(self):
         return self.Fy*self.Zz()
        
+    def C(self):
+        return (self.gamma*self.TW*self.L**4)/(pi**4*self.E*self.Iz())
+        
     def define_fiber_section(self,secTag,matTag):
         Nfw = ceil(self.dw()*(self.num_fiber/self.d))
         Nff = ceil(self.tf*(self.num_fiber/self.d))
@@ -266,9 +270,20 @@ class wf:
             data_height[iStep+1] = zw
 
             # Stop analysis if water level too low
-            if (zw-zo) <= 0.95*(np.amax(data_height)-zo):
+            if (zw-zo) <= (1-self.percent_drop)*(np.amax(data_height)-zo):
                 end_step = iStep+1
                 break
+            
+        # Extra Results
+        if self.extra_results:
+            x = np.linspace(0.0, self.L, num=(self.num_elements+1))
+            y = np.zeros((self.num_elements+1,1))
+            M = np.zeros((self.num_elements+1,1))
+            for i in range(self.num_elements+1):
+                y[i] = ops.nodeDisp(i,2)
+                if i != self.num_elements:
+                    M[i] = -ops.eleForce(i,3)
+            extra_results = (x,y,M)
             
         # Wipe Analysis
         ops.wipe()
@@ -276,7 +291,11 @@ class wf:
         data_volume = data_volume[:end_step]
         data_height = data_height[:end_step]
     
-        return (data_volume,data_height)
+    
+        if self.extra_results:
+            return (data_volume,data_height,extra_results)
+        else:
+            return (data_volume,data_height)
 
     def steel_beam_object(self):
         elastic_beam = steel_beam();
