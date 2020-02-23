@@ -94,7 +94,7 @@ for span_and_section in list_spans_and_sections:
                                 for method in methods:
                                         if method == 'AISC Appendix 2' and slope != 0.0:
                                                 pfMethod[method,city] = np.append(pfMethod[method,city],1.0)
-                                                betaMethod[method,city] = np.append(betaMethod[method,city],5.0)
+                                                betaMethod[method,city] = np.append(betaMethod[method,city],-5.0)
                                                 imethod += 1
                                                 continue
                                         ds = df[:,imethod] - df[:,Nmethods+icity]
@@ -155,20 +155,24 @@ doc.append(NoEscape(r'\clearpage'))
 
 
 plt.figure()
-im = 1
+fig,axes = plt.subplots(2,2,sharex=True)
+
+im = 0
 for method in methods:
-        plt.subplot(2,2,im)
+        r = im // 2
+        c = im % 2
         for city in locations:
-                plt.plot(spanToDepth,betaMethod[method,city],'b2',label=method)
-        plt.xlim(left=16)
-        plt.ylim([0,5.2])
-        plt.yticks([0,1,2,3,4,5], ('0','1','2','3','4','inf'))
-        plt.plot([0,31],[2.6,2.6],'k--')
-        if im == 3 or im == 4:
-                plt.xlabel('Span to Depth ($L/d$)')
-        if im == 1 or im == 3:
-                plt.ylabel('Reliability Index')
-        plt.title(method)
+                axes[r,c].plot(spanToDepth,betaMethod[method,city],'k2',label=method)
+        axes[r,c].set_xlim(left=16)
+        axes[r,c].set_ylim([0,5.2])
+        axes[r,c].set_yticks([0,1,2,3,4,5])
+        axes[r,c].set_yticklabels(['0','1','2','3','4','inf'])
+        axes[r,c].plot([0,31],[2.6,2.6],'k--')
+        if r == 1:
+                axes[r,c].set_xlabel('Span to Depth ($L/d$)')
+        if c == 0:
+                axes[r,c].set_ylabel('Reliability Index')
+        axes[r,c].set_title(method)
         im += 1
 
 plt.savefig(f'betaSpanToDepth.pdf')
@@ -183,21 +187,24 @@ doc.append(NoEscape(r'\clearpage'))
 
 
 plt.figure()
-im = 1
+fig,axes = plt.subplots(2,2,sharex=True)
+
+im = 0
 for method in methods:
-        plt.subplot(2,2,im)
+        r = im // 2
+        c = im % 2
         for city in locations:
-                plt.plot(spanToDepth,pfMethod[method,city],'b2',label=method)
-        plt.xlim(left=16)
-        plt.ylim(top=0.01,bottom=-0.0005)
-        plt.plot([0,31],[0.0047,0.0047],'k--')
-        if im == 4:
-                plt.ylim(top=0.4,bottom=-0.05)
-        if im == 3 or im == 4:
-                plt.xlabel('Span to Depth ($L/d$)')
-        if im == 1 or im == 3:
-                plt.ylabel('Probability of Failure')
-        plt.title(method)
+                axes[r,c].plot(spanToDepth,pfMethod[method,city],'k2',label=method)
+        axes[r,c].set_xlim(left=16)
+        axes[r,c].set_ylim(top=0.01,bottom=-0.0005)
+        #axes[r,c].plot([0,31],[0.0047,0.0047],'k--')
+        if im == 3:
+                axes[r,c].set_ylim(top=0.4,bottom=-0.05)
+        if r == 1:
+                axes[r,c].set_xlabel('Span to Depth ($L/d$)')
+        if c == 0:
+                axes[r,c].set_ylabel('Probability of Failure')
+        axes[r,c].set_title(method)
         im += 1
 
 plt.savefig(f'pfSpanToDepth.pdf')
