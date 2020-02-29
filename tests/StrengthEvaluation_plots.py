@@ -60,9 +60,9 @@ ax3.plot([15,32],[1,1],'k-',linewidth=0.5)
 ax3.scatter(12*L_ft/d_in,zmax_elastic_reduced/zmax_inelastic,4,color='k')
 ax3.set(xlabel='Span-to-Depth Ratio', ylabel='Max Water Height Ratio\n(Reduced Stiffness)', xlim=(15,32), ylim=(0.95,1.3))
 
-fig.text(0.56,0.68,'(c)',fontsize=8)
+fig.text(0.56,0.68,'(a)',fontsize=8)
 fig.text(0.56,0.36,'(b)',fontsize=8)
-fig.text(0.56,0.01,'(a)',fontsize=8)
+fig.text(0.56,0.01,'(c)',fontsize=8)
 
 plt.savefig('StrengthEvaluationOutput.png',dpi=300)
 plt.savefig('StrengthEvaluationOutput.pdf')
