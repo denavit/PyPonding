@@ -44,24 +44,24 @@ plt.rc('legend',fontsize=8)
 plt.rc('xtick',labelsize=8)
 plt.rc('ytick',labelsize=8)
 
-fig = plt.figure(figsize=(3.25,5.00))
+fig = plt.figure(figsize=(3.25,5.50))
 
-ax1 = fig.add_axes([0.18,0.75,0.80,0.23])
+ax1 = fig.add_axes([0.18,0.76,0.80,0.22])
 ax1.plot([15,32],[1,1],'k-',linewidth=0.5)
 ax1.scatter(12*L_ft/d_in,zmax_elastic/zmax_inelastic,4,color='k')
-ax1.set(ylabel='Max Water Height Ratio\n(Nominal Stiffness)', xlim=(15,32), ylim=(0.95,1.3))
+ax1.set(xlabel='Span-to-Depth Ratio ($L/d$)', ylabel='Max Water Level Ratio\n(Nominal Stiffness)', xlim=(15,32), ylim=(0.95,1.3))
 
-ax2 = fig.add_axes([0.18,0.43,0.80,0.23])
+ax2 = fig.add_axes([0.18,0.43,0.80,0.22])
 ax2.scatter(12*L_ft/d_in,tau,4,color='k')
-ax2.set(ylabel='Computed Stiffness\nReduction Factor', xlim=(15,32), ylim=(0.50,0.90))
+ax2.set(xlabel='Span-to-Depth Ratio ($L/d$)', ylabel='Computed Stiffness\nReduction Factor', xlim=(15,32), ylim=(0.50,0.90))
 
-ax3 = fig.add_axes([0.18,0.11,0.80,0.23])
+ax3 = fig.add_axes([0.18,0.10,0.80,0.22])
 ax3.plot([15,32],[1,1],'k-',linewidth=0.5)
 ax3.scatter(12*L_ft/d_in,zmax_elastic_reduced/zmax_inelastic,4,color='k')
-ax3.set(xlabel='Span-to-Depth Ratio', ylabel='Max Water Height Ratio\n(Reduced Stiffness)', xlim=(15,32), ylim=(0.95,1.3))
+ax3.set(xlabel='Span-to-Depth Ratio ($L/d$)', ylabel='Max Water Level Ratio\n(Reduced Stiffness)', xlim=(15,32), ylim=(0.95,1.3))
 
-fig.text(0.56,0.68,'(a)',fontsize=8)
-fig.text(0.56,0.36,'(b)',fontsize=8)
+fig.text(0.56,0.67,'(a)',fontsize=8)
+fig.text(0.56,0.34,'(b)',fontsize=8)
 fig.text(0.56,0.01,'(c)',fontsize=8)
 
 plt.savefig('StrengthEvaluationOutput.png',dpi=300)
