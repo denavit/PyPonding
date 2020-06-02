@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 #from matplotlib import rc
 from wide_flange import wf,wf_shapes
 
+y_value_for_infty = 4.4
+ylim_max = y_value_for_infty + 0.2
+
 # Define units
 inch = 1.0
 kip = 1.0
@@ -103,7 +106,7 @@ for span_and_section in list_spans_and_sections:
                                         if pf > 0.0:
                                                 beta = -norm.ppf(pf)
                                         else:
-                                                beta = 5
+                                                beta = y_value_for_infty
                                         betaMethod[method,city] = np.append(betaMethod[method,city],beta)
                                         print(f'  Method {imethod+1}, pf={pf}, beta={beta}')
                                         imethod += 1
@@ -128,11 +131,12 @@ for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
 ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(a) DAMP (without stiffness reduction)')
 
 method = methods[1]
@@ -141,11 +145,12 @@ for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
 ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(b) Modified Rain Load (with stiffness reduction)')
 
 plt.savefig('betaSpanToDepth_alt_stiff.png',dpi=300)
