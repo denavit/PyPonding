@@ -357,6 +357,24 @@ class wf:
             elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
             zw = elastic_beam.Run_To_Strength_Limit()
             
+        elif method == 'DAMP 1.4':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.E      = 0.8*self.E
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.4
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw = elastic_beam.Run_To_Strength_Limit()
+
+        elif method == 'DAMP 1.6':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.E      = 0.8*self.E
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.6
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw = elastic_beam.Run_To_Strength_Limit()            
+            
         elif method == 'Proposed for ASCE 7' or method == 'Modified Rain Load':
             elastic_beam = self.steel_beam_object()
             elastic_beam.nele   = 40
