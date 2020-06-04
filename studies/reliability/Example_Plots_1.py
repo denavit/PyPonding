@@ -3,7 +3,7 @@ from math import pi,ceil
 import numpy as np
 from numpy import cos,cosh
 import matplotlib.pyplot as plt
-from wide_flange import wf,wf_shapes
+from PyPonding.structures import wf,wf_shapes
 
 # Define units
 inch = 1.0
