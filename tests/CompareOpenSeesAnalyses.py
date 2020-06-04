@@ -2,7 +2,7 @@ import openseespy.opensees as ops
 from math import pi,cos,cosh,ceil
 import numpy as np
 import matplotlib.pyplot as plt
-from wide_flange import wf,wf_shapes
+from PyPonding.structures import wf,wf_shapes
 
   
 # Define units

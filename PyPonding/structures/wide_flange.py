@@ -1,15 +1,9 @@
 import numpy as np
-
-#import openseespy.opensees as ops
-import sys
-sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
-import opensees as ops
-
-sys.path.append('/home/mhscott/PyPonding')
-import PyPonding.FE as FE
-from PyPonding.PondingLoadCell_OPS import PondingLoadCell2d_OPS
-from PyPonding.structures.steel_beam import steel_beam
 from math import pi,ceil
+from PyPonding import PondingLoadCell2d_OPS
+from PyPonding.structures import steel_beam
+
+import openseespy.opensees as ops
 
 class wf:
     geomTransfType = 'Linear'
