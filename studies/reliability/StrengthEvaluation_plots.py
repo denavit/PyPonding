@@ -2,7 +2,7 @@ import csv
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from wide_flange import wf_shapes
+from PyPonding.structures import wf_shapes
 
 with open('StrengthEvaluationOutput.csv', 'r') as f:
     reader = csv.reader(f)
