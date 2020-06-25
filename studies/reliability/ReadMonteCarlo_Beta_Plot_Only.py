@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 #from matplotlib import rc
 from wide_flange import wf,wf_shapes
 
+y_value_for_infty = 4.4
+ylim_max = y_value_for_infty + 0.2
+
 # Define units
 inch = 1.0
 kip = 1.0
@@ -83,7 +86,7 @@ for span_and_section in list_spans_and_sections:
                                         if pf > 0.0:
                                                 beta = -norm.ppf(pf)
                                         else:
-                                                beta = 5
+                                                beta = y_value_for_infty
                                         betaMethod[method,city] = np.append(betaMethod[method,city],beta)
                                         print(f'  Method {imethod+1}, pf={pf}, beta={beta}')
                                         imethod += 1
@@ -102,55 +105,59 @@ fig = plt.figure(figsize=(7.00,5.00))
 
 
 method = methods[0]
-ax = fig.add_axes([0.075,0.56,0.40,0.39])
+ax = fig.add_axes([0.075,0.58,0.40,0.37])
 for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
-#ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
+ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(a) AISC Appendix 2')
 
 method = methods[1]
-ax = fig.add_axes([0.575,0.56,0.40,0.39])
+ax = fig.add_axes([0.575,0.58,0.40,0.37])
 for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
-#ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
+ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(b) DAMP')
 
 method = methods[2]
-ax = fig.add_axes([0.075,0.08,0.40,0.39])
+ax = fig.add_axes([0.075,0.08,0.40,0.37])
 for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
 ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(c) Modified Rain Load')
 
 method = methods[3]
-ax = fig.add_axes([0.575,0.08,0.40,0.39])
+ax = fig.add_axes([0.575,0.08,0.40,0.37])
 for city in locations:
         plt.plot(spanToDepth,betaMethod[method,city],'k2',label=method)
 plt.plot([0,32],[2.6,2.6],'k--')
 plt.xlim([16,32])
-plt.ylim([0,5.2])
-ax.set_yticks([0,1,2,3,4,5])
-ax.set_yticklabels(['0','1','2','3','4','$\infty$'])
+plt.ylim([0,ylim_max])
+ax.set_yticks([0,1,2,3,3.7,y_value_for_infty])
+ax.set_yticklabels(['0','1','2','3','3.7','$>$3.7'])
 ax.set_xlabel('Span-to-Depth Ratio ($L/d$)')
 ax.set_ylabel('Reliability Index ($\\beta$)')
+ax.yaxis.set_label_coords(-0.12, 0.5)
 ax.set_title('(d) Neglect Ponding')
 
 plt.savefig(f'betaSpanToDepth.png',dpi=300)

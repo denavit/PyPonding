@@ -199,7 +199,7 @@ class PondingLoadManager2d:
             ops.eleLoad('-ele', i[0], '-type', '-beamPoint', fy*cos(ele_angle), i[1], fy*sin(ele_angle))
             
 class PondingLoadCell3d_OPS(PondingLoadCell3d):
-    def __init__(self, id, vertexI, nodeJ, nodeK, nodeL, gamma, na=1, nb=1):
+    def __init__(self, id, nodeI, nodeJ, nodeK, nodeL, gamma, na=1, nb=1):
         self.id = id
         self.nodeI = nodeI
         self.nodeJ = nodeJ

@@ -1,15 +1,9 @@
 import numpy as np
-
-#import openseespy.opensees as ops
-import sys
-sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
-import opensees as ops
-
-sys.path.append('/home/mhscott/PyPonding')
-import PyPonding.FE as FE
-from PyPonding.PondingLoadCell_OPS import PondingLoadCell2d_OPS
-from PyPonding.structures.steel_beam import steel_beam
 from math import pi,ceil
+from PyPonding import PondingLoadCell2d_OPS
+from PyPonding.structures import steel_beam
+
+import openseespy.opensees as ops
 
 class wf:
     geomTransfType = 'Linear'
@@ -362,6 +356,24 @@ class wf:
             elastic_beam.LF_P   = 1.2
             elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
             zw = elastic_beam.Run_To_Strength_Limit()
+            
+        elif method == 'DAMP 1.4':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.E      = 0.8*self.E
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.4
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw = elastic_beam.Run_To_Strength_Limit()
+
+        elif method == 'DAMP 1.6':
+            elastic_beam = self.steel_beam_object()
+            elastic_beam.nele   = 40
+            elastic_beam.E      = 0.8*self.E
+            elastic_beam.LF_D   = 1.2
+            elastic_beam.LF_P   = 1.6
+            elastic_beam.Mc     = 0.9*self.Fy*self.Zz()
+            zw = elastic_beam.Run_To_Strength_Limit()            
             
         elif method == 'Proposed for ASCE 7' or method == 'Modified Rain Load':
             elastic_beam = self.steel_beam_object()

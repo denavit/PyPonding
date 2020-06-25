@@ -2,7 +2,7 @@ import openseespy.opensees as ops
 from math import pi,cos,cosh,ceil,tan,tanh
 import numpy as np
 import matplotlib.pyplot as plt
-from wide_flange import wf,wf_shapes
+from PyPonding.structures import wf,wf_shapes
 
 # Define units
 inch = 1.0
@@ -128,7 +128,7 @@ print(C2)
 print(C3)
 plt.legend((line4,line1,line2,line3), ('Closed-form Solution','C = 0.424','C = 1.0','C = 1.5'),frameon=False)
 plt.xlabel('Normalized Water Volume (V/SL, mm)')
-plt.ylabel('Water Height (mm)')
+plt.ylabel('Water Level (mm)')
 plt.xlim( 0,250)
 plt.ylim(-250,250)
 plt.savefig('Example_Plot_1.png',dpi=300)
@@ -141,7 +141,7 @@ line2, = plt.plot(data_volume_L2s/(TW*L2)/mm, data_height_L2s/mm, 'k--')
 line3, = plt.plot(data_volume_L3s/(TW*L3)/mm, data_height_L3s/mm, 'k-.')
 plt.legend((line1, line2, line3), ('C = 0.424', 'C = 1.0', 'C = 1.5'),frameon=False)
 plt.xlabel('Normalized Water Volume (V/SL, mm)')
-plt.ylabel('Water Height (mm)')
+plt.ylabel('Water Level (mm)')
 plt.xlim(0,250)
 plt.ylim(0,300)
 plt.savefig('Example_Plot_2.png',dpi=300)
@@ -154,7 +154,7 @@ line2, = plt.plot(  data_volume_L1si/(TW*L1)/mm,   data_height_L1si/mm, 'k--')
 line3, = plt.plot(data_volume_L1sirs/(TW*L1)/mm, data_height_L1sirs/mm, 'r-.')
 plt.legend((line1, line2, line3), ('Elastic', 'Inelastic (no residual stress)', 'Inelastic'),frameon=False)
 plt.xlabel('Normalized Water Volume (V/SL, mm)\n(a)')
-plt.ylabel('Water Height (mm)')
+plt.ylabel('Water Level (mm)')
 plt.xlim(0,350)
 plt.ylim(0,350)
 
@@ -164,7 +164,7 @@ line2, = plt.plot(  data_volume_L1si/(TW*L1)/mm,   data_height_L1si/mm, 'k--')
 line3, = plt.plot(data_volume_L1sirs/(TW*L1)/mm, data_height_L1sirs/mm, 'r-.')
 plt.legend((line1, line2, line3), ('Elastic', 'Inelastic (no residual stress)', 'Inelastic'),frameon=False)
 plt.xlabel('Normalized Water Volume (V/SL, mm)\n(b)')
-plt.ylabel('Water Height (mm)')
+plt.ylabel('Water Level (mm)')
 plt.xlim(210,290)
 plt.ylim(250,320)
 
