@@ -2,7 +2,17 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 #from matplotlib import rc
+
+import sys
+sys.path.append('/home/mhscott/PyPonding/')
+sys.path.append('/home/mhscott/PyPonding/PyPonding/')
+sys.path.append('/home/mhscott/PyPonding/PyPonding/structures/')
+from PyPonding.structures import wide_flange
 from wide_flange import wf,wf_shapes
+
+import openseespy.opensees as ops
+
+from math import pi,log
 
 y_value_for_infty = 4.4
 ylim_max = y_value_for_infty + 0.2
@@ -17,6 +27,8 @@ ft = 12.0*inch
 hr = 60*minute
 sec = minute/60.0
 
+g = 386.4*inch/sec**2
+
 ksi = kip/inch**2
 psf = lb/ft**2
 pcf = psf/ft
@@ -29,7 +41,10 @@ list_spans_and_sections = [
     (50*ft,'W21X44'),(50*ft,'W24X55'),(50*ft,'W27X84'),(50*ft,'W30X90')]
 list_slope = [0.0*inch/ft,0.25*inch/ft,0.5*inch/ft,1.0*inch/ft]
 list_qD = [10.0*psf,20.0*psf,30.0*psf]
+
 methods = ['AISC Appendix 2','DAMP','Proposed for ASCE 7','Neglect Ponding']
+Nmethods = len(methods)
+
 colorMethod = {}
 colorMethod['AISC Appendix 2'] = 'r1'
 colorMethod['DAMP'] = 'b2'
@@ -37,7 +52,35 @@ colorMethod['Proposed for ASCE 7'] = 'g_'
 colorMethod['Neglect Ponding'] = 'k|'
 
 locations = ['Denver','New York','New Orleans']
+Ncities = len(locations)
 
+#
+# A fix to correct incorrect input to OpenSees Type I largest value PDF without
+# having to re-run all 192 Monte Carlo simulations
+#
+rate = {}
+perc95 = {}
+rate['Denver'] = 1.26*inch/(0.25*hr)
+perc95['Denver'] = 1.72*inch/(0.25*hr)
+rate['New York'] = 1.67*inch/(0.25*hr)
+perc95['New York'] = 2.33*inch/(0.25*hr)
+rate['New Orleans'] = 2.33*inch/(0.25*hr)
+perc95['New Orleans'] = 3.11*inch/(0.25*hr)
+
+scale = {}
+loc = {}
+icity = 0; Ncities = len(locations)
+for city in locations:
+        icity += 1
+        eulergamma = 0.57721566490153286061
+        scale[city] = (rate[city]-perc95[city])/(log(-log(0.95))+eulergamma)
+        loc[city] = rate[city] - scale[city]*eulergamma
+        # Old random variable
+        ops.randomVariable(icity,'type1LargestValue','-mean',rate[city],'-stdv',(scale[city]*6**0.5)/pi)
+        # New random variable
+        ops.randomVariable(icity+Ncities,'type1LargestValue','-parameters',loc[city],1/scale[city])
+
+        
 betaMethod = {}
 pfMethod = {}
 for city in locations:
@@ -62,15 +105,36 @@ for span_and_section in list_spans_and_sections:
                         icase += 1
                         print(icase)
        
-                        df = np.loadtxt(f'trials{icase}.csv',skiprows=2,delimiter=',')
+                        df = np.loadtxt(f'../../tests/trials{icase}.csv',skiprows=2,delimiter=',')
                         [Ntrials,c] = df.shape
 
+                        #
+                        # Modify the data as a workaround for the OpenSees random variable input issue
                         icity = 0
-                        Ncities = len(locations)
+                        for city in locations:
+                                for j in range(Ntrials):
+                                        # Read old dh, then calculate intensity
+                                        dhold = df[j,Nmethods+Ncities+icity]
+                                        q = (0.6*12*inch*(2*g)**0.5*dhold**1.5)/1.5
+                                        As = (40*ft)*L
+                                        intensity = q/As
+
+                                        # Convert to new intensity based on CDFs
+                                        p = ops.getCDF(icity+1, intensity)
+                                        intensity = ops.getInverseCDF(icity+1+Ncities, p)
+
+                                        # Calculate new flow and dh
+                                        q = intensity*As
+                                        dhnew = (1.5*q/(0.6*12*inch*(2*g)**0.5))**(2.0/3)
+                                        df[j,Nmethods+Ncities+icity] = dhnew
+                                icity += 1
+                        # End modification
+                        #
+                        
+                        icity = 0
                         for city in locations:
                                 print(city)
                                 imethod = 0
-                                Nmethods = len(methods)
                                 for method in methods:
                                         if method == 'AISC Appendix 2' and slope != 0.0:
                                                 pfMethod[method,city] = np.append(pfMethod[method,city],1.0)
