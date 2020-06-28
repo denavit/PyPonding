@@ -5,6 +5,7 @@ import opensees as ops
 
 from math import pi,cos,cosh,ceil,log
 from scipy.stats import norm
+import scipy.stats
 
 sys.path.append('/home/mhscott/PyPonding')
 from PyPonding.PondingLoadCell import PondingLoadCell2d
@@ -36,6 +37,9 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
         
 def doPondingAnalysis(shape_name,L,slope,qD,label):
 
+    # For creating a certain figure
+    np.random.seed(15)
+    
     inch = 1.0
     kip = 1.0
     minute = 1.0
@@ -93,14 +97,15 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     nsteps = 100
     nsteps = 250
     nsteps = 3000
-    nsteps = 1000
+    #nsteps = 1000
     
     # Number of Monte Carlo trials
     Ntrials = 1000
     #Ntrials = 200
     Ntrials = 99
     Ntrials = 1
-
+    Ntrials = 200
+    
     # From function input
     wfs = wf_shapes[shape_name]
     d = wfs['d']*inch
@@ -207,14 +212,16 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     
     ops.probabilityTransformation('Nataf')
 
+    scale = {}
+    loc = {}
     rateRVTag = 5
     for city in locations:
         #ops.randomVariable(rateRVTag,'lognormal','-mean',rate,'-stdv',0.2*rate)
         eulergamma = 0.57721566490153286061
-        scale = (rate[city]-perc95[city])/(log(-log(0.95))+eulergamma)
-        loc = rate[city] - scale*eulergamma
+        scale[city] = (rate[city]-perc95[city])/(log(-log(0.95))+eulergamma)
+        loc[city] = rate[city] - scale[city]*eulergamma
         #ops.randomVariable(rateRVTag,'type1LargestValue','-parameters',loc,scale)
-        ops.randomVariable(rateRVTag,'type1LargestValue','-mean',rate[city],'-stdv',(scale*6**0.5)/pi)
+        ops.randomVariable(rateRVTag,'type1LargestValue','-mean',rate[city],'-stdv',(scale[city]*6**0.5)/pi)
         ops.parameter(rateRVTag)
         ops.updateParameter(rateRVTag,rate[city])
         rateRVTag += 1
@@ -305,6 +312,14 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
         output.write(f'dh {city},')        
     output.write('dmax\n')
 
+    import matplotlib.pyplot as plt
+    from matplotlib import rc
+    rc('text',usetex=True)
+    rc('font',family='serif')
+
+    plt.figure()
+    plt.subplot(2,1,1)
+    
     for j in range(Ntrials+1):
         print(j,label)
         
@@ -353,6 +368,7 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
             output.write(f'{dhnom[city]},')
         rateRVTag = 5
         for city in locations:
+            #x[rateRVTag-1] = scipy.stats.gumbel_r.ppf(u[rateRVTag-1],loc[city],scale[city])
             q = x[rateRVTag-1]*As
             dh = (1.5*q/(cd*ws*(2*g)**0.5))**(2.0/3)
             output.write(f'{dh},')
@@ -440,6 +456,11 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
                 end_step = iStep+1
                 break        
 
+        plt.plot(data_volume[:end_step]/(Ss*L)*25.4,data_height[:end_step]*25.4,'k',linewidth=0.5,label='MC Trial')
+        method = 'DAMP'
+        city = 'Denver'
+        ds = zw_lim[method] - dhnom[city]
+        plt.plot([0,8*25.4],[(ds+dh)*25.4,(ds+dh)*25.4],'r--',linewidth=0.1,label='Design Limit')
         output.write(f'{max(data_height)}')
         output.write('\n')
 
@@ -457,3 +478,13 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
 
     # Remove random variables bc ops.wipe() doesn't do this yet
     ops.wipeReliability()
+
+    #plt.plot([0,8*25.4],[16.5*25.4,16.5*25.4],'r--',label='Design Limit')
+    plt.xlim(left=0,right=200)
+    plt.ylim(bottom=0)
+    plt.legend()
+    plt.ylabel('Water Level (mm)')
+    plt.xlabel('Normalized Water Volume, $V/SL$ (mm)')
+
+    plt.savefig('MCtrials.pdf',bbox_inches='tight')
+    plt.show()

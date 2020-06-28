@@ -1,5 +1,7 @@
 from math import sin,cos,atan2
 from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
+import sys
+sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
 try:
     import opensees as ops
 except ImportError:
@@ -49,7 +51,7 @@ class ElementEnd2d:
         import warnings
         warnings.warn('PondingLoadCell not fully implemented for ends within and element. Displacement will be returned as zero.')
         dx = 0.
-        dy = 0.
+        dy = ops.cbdiDisplacement(self.element_id,self.x)
         return (dx,dy)
 
 def define_end(arg):
