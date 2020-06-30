@@ -1,17 +1,23 @@
-#import openseespy.opensees as ops
 import sys
 sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
-import opensees as ops
+#import opensees as ops
+
+import matplotlib.pyplot as plt
+import openseespy.opensees as ops
 
 from math import pi,cos,cosh,ceil,log
 from scipy.stats import norm
 import scipy.stats
 
-sys.path.append('/home/mhscott/PyPonding')
+sys.path.append('/home/mhscott/PyPonding/')
+sys.path.append('/home/mhscott/PyPonding/PyPonding/')
+sys.path.append('/home/mhscott/PyPonding/PyPonding/structures/')
+from PyPonding.structures import wide_flange
+from wide_flange import wf,wf_shapes
+
+
 from PyPonding.PondingLoadCell import PondingLoadCell2d
 import numpy as np
-
-from wide_flange import wf,wf_shapes
 
 class PondingLoadCell2d_OPS(PondingLoadCell2d):
     def __init__(self,id,nodeI,nodeJ,gamma,tw):
@@ -456,11 +462,18 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
                 end_step = iStep+1
                 break        
 
-        plt.plot(data_volume[:end_step]/(Ss*L)*25.4,data_height[:end_step]*25.4,'k',linewidth=0.5,label='MC Trial')
+        lw = 0.1
+        ls = 'grey'
+        label = 'Safe Trial'
+        if max(data_height) < 16.5:
+            lw = 1.5
+            ls = 'k'
+            label = 'Fail Trial'
+        plt.plot(data_volume[:end_step]/(Ss*L)*25.4,data_height[:end_step]*25.4,ls,linewidth=lw,label=label)
         method = 'DAMP'
         city = 'Denver'
         ds = zw_lim[method] - dhnom[city]
-        plt.plot([0,8*25.4],[(ds+dh)*25.4,(ds+dh)*25.4],'r--',linewidth=0.1,label='Design Limit')
+        #plt.plot([0,8*25.4],[(ds+dh)*25.4,(ds+dh)*25.4],'r',linewidth=0.011,label='Design Limit')
         output.write(f'{max(data_height)}')
         output.write('\n')
 
@@ -479,12 +492,13 @@ def doPondingAnalysis(shape_name,L,slope,qD,label):
     # Remove random variables bc ops.wipe() doesn't do this yet
     ops.wipeReliability()
 
-    #plt.plot([0,8*25.4],[16.5*25.4,16.5*25.4],'r--',label='Design Limit')
-    plt.xlim(left=0,right=200)
+    plt.plot([0,8*25.4],[16.5*25.4,16.5*25.4],'r--',label='Design Limit')
+    plt.xlim(left=0,right=175)
     plt.ylim(bottom=0)
-    plt.legend()
+    plt.legend(ncol=2,frameon=False)
     plt.ylabel('Water Level (mm)')
     plt.xlabel('Normalized Water Volume, $V/SL$ (mm)')
 
     plt.savefig('MCtrials.pdf',bbox_inches='tight')
+    plt.savefig('MCtrials.png',bbox_inches='tight')    
     plt.show()
