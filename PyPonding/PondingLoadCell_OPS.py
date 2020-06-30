@@ -1,7 +1,6 @@
 from math import sin,cos,atan2
 from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
-import sys
-sys.path.append('/home/mhscott/OpenSees/SRC/interpreter')
+
 try:
     import opensees as ops
 except ImportError:
