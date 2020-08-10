@@ -191,7 +191,7 @@ class PondingLoadManager2d:
             ops.load(i, 0.0, fy, 0.0)
         for i in self.committed_element_loads:
             fy = self.current_element_loads[i] - self.committed_element_loads[i]
-            iNodes = ops.eleNodes(0)
+            iNodes = ops.eleNodes(i[0])
             xI,yI = ops.nodeCoord(iNodes[0])
             xJ,yJ = ops.nodeCoord(iNodes[1])
             ele_angle = atan2(yJ-yI, xJ-xI)
