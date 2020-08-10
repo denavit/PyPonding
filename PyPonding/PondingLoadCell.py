@@ -142,6 +142,7 @@ class PondingLoadCell2d:
 class PondingLoadCell3d:
     id      = ''    # Load cell ID
     
+    # Define nodes (vertices) in counterclockwise (CCW) direction
     xI      = 0.0   # X coordinate of Node I
     yI      = 0.0   # Y coordinate of Node I
     zI      = 0.0   # Z coordinate of Node I
