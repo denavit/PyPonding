@@ -480,6 +480,7 @@ class ExampleRoof:
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
                 PondingLoadManager.cells[id].vertexL.z_offset = z_offsetL
+                PondingLoadManager.cells[id].update_coord()
 
 
         # Define ponding load cells between B and C
@@ -597,6 +598,7 @@ class ExampleRoof:
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
                 PondingLoadManager.cells[id].vertexL.z_offset = z_offsetL
+                PondingLoadManager.cells[id].update_coord()
 
 
         # Define ponding load cells between C and D
@@ -716,6 +718,7 @@ class ExampleRoof:
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
                 PondingLoadManager.cells[id].vertexL.z_offset = z_offsetL
+                PondingLoadManager.cells[id].update_coord()
 
 
         ###########################################################

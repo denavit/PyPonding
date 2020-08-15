@@ -305,10 +305,7 @@ class PondingLoadCell3d_OPS(PondingLoadCell3d):
         self.nb = nb
 
         # Retreive Coordinates
-        self.xI, self.yI, self.zI = self.vertexI.coord()
-        self.xJ, self.yJ, self.zJ = self.vertexJ.coord()
-        self.xK, self.yK, self.zK = self.vertexK.coord()
-        self.xL, self.yL, self.zL = self.vertexL.coord()        
+        self.update_coord()
                 
         # Store node ids (if attached to nodes) for backwards compatibility 
         if isinstance(self.vertexI, NodeVertex3d):
@@ -328,6 +325,12 @@ class PondingLoadCell3d_OPS(PondingLoadCell3d):
         else:
             self.nodeL = None            
         
+    def update_coord(self):
+        self.xI, self.yI, self.zI = self.vertexI.coord()
+        self.xJ, self.yJ, self.zJ = self.vertexJ.coord()
+        self.xK, self.yK, self.zK = self.vertexK.coord()
+        self.xL, self.yL, self.zL = self.vertexL.coord()    
+    
     def update(self):
         # Code currently only updates z postion of nodes - @todo maybe update x and y positions also
         self.dzI = self.vertexI.disp()[2]
