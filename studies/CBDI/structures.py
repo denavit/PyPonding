@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import openseespy.opensees as ops
+import time
 from math import atan2,pi,pow,sqrt
 from mpl_toolkits.mplot3d import Axes3D
 from PyPonding import PondingLoadManager3d
@@ -12,6 +13,21 @@ def camber(xi,L,c):
         r = (c**2 + (L/2)**2)/(2*c)
         z = sqrt(r**2 - (xi*L - L/2)**2) + (c-r)
     return z
+
+class AnalysisResults:
+    print_each_analysis_time_increment = True
+    total_analysis_time = 0.
+    
+    def __init__(self):
+        pass
+        
+    def add_to_analysis_time(self,tic,toc):
+        self.total_analysis_time += toc - tic
+        if self.print_each_analysis_time_increment:
+            print(f"Adding {toc - tic:0.4f} seconds to total analysis run time.")
+
+    def print_total_analysis_time(self):
+        print(f"Total analysis time: {self.total_analysis_time:0.4f} seconds")
 
 class ExampleRoof:
 
@@ -822,6 +838,14 @@ class ExampleRoof:
         ###########################################################
         # Run Analysis
         ###########################################################
+
+        # Initilize data
+        results = AnalysisResults()
+        results.water_volume = np.zeros((self.num_steps_zw+1,1))
+        results.water_level  = np.zeros((self.num_steps_zw+1,1))
+        results.col_react_B2 = np.zeros((self.num_steps_zw+1,1))
+        
+        # Set up analysis
         ops.numberer("RCM")
         ops.constraints("Plain")
         ops.system("BandSPD")
@@ -829,25 +853,21 @@ class ExampleRoof:
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
         ops.analysis("Static")
+        tic = time.perf_counter()
         ops.analyze(1)
+        toc = time.perf_counter()
+        results.add_to_analysis_time(tic,toc)
         ops.reactions()
 
         #print(ops.systemSize())
 
         # Find lowest point
         zo = self.lowest_point()
-
-        # Initilize data
-        self.num_steps_zw = 100
-        end_step = self.num_steps_zw+1
-        data_volume = np.zeros((self.num_steps_zw+1,1))
-        data_height = np.zeros((self.num_steps_zw+1,1))
-
-        data_volume[0] = 0.
-        data_height[0] = zo
-        #print(data_volume[0][0])
-        #print(data_height[0][0])
-        #print(zo)
+    
+        # Store Reuslts
+        results.water_volume[0] = 0.
+        results.water_level[0]  = zo
+        results.col_react_B2[0] = self.ColumnReaction('B2')
 
         # Run Ponding Analysis
         ops.timeSeries("Constant", self.ponding_load_ts_tag)
@@ -868,15 +888,18 @@ class ExampleRoof:
             PondingLoadManager.commit_current_load_vector()
 
             # Run analysis
+            tic = time.perf_counter()
             ops.analyze(1)
+            toc = time.perf_counter()
+            results.add_to_analysis_time(tic,toc)
             ops.reactions()
 
-            # Store Data
-            data_volume[iStep] = iV
-            data_height[iStep] = izw
-            #print(data_volume[iStep][0])
-            #print(data_height[iStep][0])
-            #print(self.lowest_point())
+            # Store Reuslts
+            results.water_volume[iStep] = iV
+            results.water_level[iStep]  = izw
+            results.col_react_B2[iStep] = self.ColumnReaction('B2')
+
+        results.print_total_analysis_time()
 
         # Plot Ponding Load Cells
         if self.plot_load_cells:
@@ -897,6 +920,8 @@ class ExampleRoof:
                 Z = np.array([[coordJ[2], coordK[2]], [coordI[2], coordL[2]]])
                 surf = ax.plot_surface(X, Y, Z, linewidth=1)
             plt.show()
+        
+        return results
 
     def PlotModel(self):
         fig = plt.figure()
