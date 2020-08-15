@@ -62,6 +62,7 @@ class ExampleRoof:
 
     # Analysis Options
     use_CBDI = False
+    include_ponding_effect = True
     ndiv_J  = 10
     na      = 4
     nb      = 4
@@ -853,7 +854,8 @@ class ExampleRoof:
         for iStep in range(1,self.num_steps_zw+1):
 
             # Update ponding load cells
-            PondingLoadManager.update()
+            if self.include_ponding_effect:
+                PondingLoadManager.update()
 
             # Compute load vector
             izw = zo + (iStep/self.num_steps_zw)*(self.zw-zo)
