@@ -1,4 +1,4 @@
-from math import sin,cos,atan2
+from math import sin,cos,atan2,sqrt
 from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
 
 try:
@@ -467,11 +467,13 @@ class PondingLoadManager3d:
             fy = self.current_nodal_loads[i] - self.committed_nodal_loads[i]
             ops.load(i, 0.0, 0.0, fy, 0.0, 0.0, 0.0)
         for i in self.committed_element_loads:
-            raise Exception('Element load application not yet implemented')
-            # fy = self.current_element_loads[i] - self.committed_element_loads[i]
-            # iNodes = ops.eleNodes(i[0])
-            # xI,yI,zI = ops.nodeCoord(iNodes[0])
-            # xJ,yJ,zJ = ops.nodeCoord(iNodes[1])
-            # ele_angle = atan2(yJ-yI, xJ-xI)
-            # ops.eleLoad('-ele', i[0], '-type', '-beamPoint', fy*cos(ele_angle), i[1], fy*sin(ele_angle))
+            # @todo - this code assumed local y axis is upward, update with axis call
+            fy = self.current_element_loads[i] - self.committed_element_loads[i]
+            iNodes = ops.eleNodes(i[0])
+            xI,yI,zI = ops.nodeCoord(iNodes[0])
+            xJ,yJ,zJ = ops.nodeCoord(iNodes[1])
+            Lz = zJ-zI
+            Lxy = sqrt((xJ-xI)**2 + (yJ-yI)**2)
+            ele_angle = atan2(Lz, Lxy)
+            ops.eleLoad('-ele', i[0], '-type', '-beamPoint', fy*cos(ele_angle), 0.0, i[1], fy*sin(ele_angle))
     
