@@ -475,7 +475,7 @@ class ExampleRoof:
 
                 # add load cell
                 id = 'AB_%03ix_%03iy' % (i,j)
-                PondingLoadManager.add_cell(id,vertexI,vertexL,vertexK,vertexJ,self.gamma,self.na,self.nb)
+                PondingLoadManager.add_cell(id,vertexI,vertexJ,vertexK,vertexL,self.gamma,self.na,self.nb)
                 PondingLoadManager.cells[id].vertexI.z_offset = z_offsetI
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
@@ -592,7 +592,7 @@ class ExampleRoof:
 
                 # add load cell
                 id = 'BC_%03ix_%03iy' % (i,j)
-                PondingLoadManager.add_cell(id,vertexI,vertexL,vertexK,vertexJ,self.gamma,self.na,self.nb)
+                PondingLoadManager.add_cell(id,vertexI,vertexJ,vertexK,vertexL,self.gamma,self.na,self.nb)
                 PondingLoadManager.cells[id].vertexI.z_offset = z_offsetI
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
@@ -711,7 +711,7 @@ class ExampleRoof:
 
                 # add load cell
                 id = 'CD_%03ix_%03iy' % (i,j)
-                PondingLoadManager.add_cell(id,vertexI,vertexL,vertexK,vertexJ,self.gamma,self.na,self.nb)
+                PondingLoadManager.add_cell(id,vertexI,vertexJ,vertexK,vertexL,self.gamma,self.na,self.nb)
                 PondingLoadManager.cells[id].vertexI.z_offset = z_offsetI
                 PondingLoadManager.cells[id].vertexJ.z_offset = z_offsetJ
                 PondingLoadManager.cells[id].vertexK.z_offset = z_offsetK
