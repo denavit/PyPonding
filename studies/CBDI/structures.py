@@ -4,7 +4,7 @@ import openseespy.opensees as ops
 import time
 from math import atan2,pi,pow,sqrt
 from mpl_toolkits.mplot3d import Axes3D
-from PyPonding import PondingLoadManager3d
+from PyPonding import PondingLoadManager2d,PondingLoadManager3d
 
 def camber(xi,L,c):
     if c == 0:
@@ -29,7 +29,271 @@ class AnalysisResults:
     def print_total_analysis_time(self):
         print(f"Total analysis time: {self.total_analysis_time:0.4f} seconds")
 
-class ExampleRoof:
+class ExampleStructure:
+
+    # Common Properties
+    use_CBDI = False
+    include_ponding_effect = True
+    _element_type_override = None
+    
+    def __init__(self):
+        pass   
+  
+    @property
+    def element_type(self):
+        if self._element_type_override is None:
+            if self.use_CBDI:
+                return 'forceBeamColumn'
+            else:
+                return 'dispBeamColumn'
+        else:
+            return self._element_type_override
+
+    @element_type.setter
+    def element_type(self, value):
+        self._element_type_override = value
+
+class ExampleBeam(ExampleStructure):
+
+    # Geometric Properties
+    L   = 480
+    yi  = 0
+    yj  = 6
+    c   = 1
+    S   = 60.
+    
+    # Support Spring Stiffnessnes
+    yi_fixed = True
+    yj_fixed = True
+    xj_fixed = False
+    kyi = 0.
+    kyj = 0.
+    kxj = 0.
+
+    # Cross Sctional Properties 
+    E   = 29000
+    A   = 100.
+    I   = 215.
+
+    # Loads
+    qD      = 10./1000/12**2 # Uniform dead load (forcer per unit area, downward positive)
+    gamma   = 62.4/1000/12**3
+    zw      = 6
+
+    # Analysis Options
+    ndiv  = 10
+    num_steps_zw = 1000
+    transf_type = 'Linear'
+    
+    # @todo add analysis options
+    #   1. path analysis, ramping up volume and simple step incremental
+    #   2. lumped analysis, going directly to zw and iterating
+    
+    transf_tag  = 1
+    section_tag = 1
+    beamint_tag = 1
+    dead_load_pattern_tag = 1
+    dead_load_ts_tag = 1
+    ponding_load_pattern_tag_start = 2
+    ponding_load_ts_tag = 2  
+    
+    def __init__(self):
+        pass  
+ 
+    def lowest_point(self):
+        yo = float('inf')
+        for i in ops.getNodeTags():
+            iy = ops.nodeCoord(i, 2) + ops.nodeDisp(i, 2)
+            if iy < yo:
+                yo = iy
+        return yo
+ 
+    @property
+    def nele(self):
+        if self.use_CBDI:
+            return 1
+        else:
+            return self.ndiv
+
+    def RunAnalysis(self):
+
+        ops.wipe()
+        ops.model('basic', '-ndm', 2, '-ndf', 3)
+
+        # Define nodes
+        for i in range(self.nele+1):
+            xi = (i/self.nele)
+            x = xi*self.L
+            y = self.yi + xi*(self.yj-self.yi) + camber(xi,self.L,self.c)
+            ops.node(i,x,y)
+        
+        # Define boundary conditions
+        if self.yi_fixed:
+            ops.fix(0,1,1,0)
+        else:
+            ops.fix(0,1,0,0)
+            ops.node(1001,0.0,self.yi)
+            ops.fix(1001,1,1,1)
+            ops.uniaxialMaterial('Elastic', 1001, self.kyi)
+            ops.element('zeroLength', 1001, 1001, 0, '-mat', 1001, '-dir', 2)
+
+        if self.yj_fixed and self.xj_fixed:
+            ops.fix(self.nele,1,1,0)
+        elif self.yj_fixed:
+            ops.fix(self.nele,0,1,0)
+        elif self.xj_fixed:
+            ops.fix(self.nele,1,0,0)
+        
+        if (not self.yj_fixed) and (self.kyj != 0.):
+            ops.node(1002,self.L,self.yj)
+            ops.fix(1002,1,1,1)
+            ops.uniaxialMaterial('Elastic', 1002, self.kyj)
+            ops.element('zeroLength', 1002, 1002, self.nele, '-mat', 1002, '-dir', 2)
+        
+        if (not self.xj_fixed) and (self.kxj != 0.):
+            ops.node(1003,self.L,self.yj)
+            ops.fix(1003,1,1,1)
+            ops.uniaxialMaterial('Elastic', 1003, self.kxj)
+            ops.element('zeroLength', 1003, 1003, self.nele, '-mat', 1003, '-dir', 1)
+            
+        # Define elements
+        ops.geomTransf(self.transf_type, self.transf_tag)
+        ops.section('Elastic', self.section_tag, self.E, self.A, self.I)
+        ops.beamIntegration('Lobatto', self.beamint_tag, self.section_tag, 4)
+        for i in range(self.nele):
+            ops.element(self.element_type, i, i, i+1, self.transf_tag, self.beamint_tag)
+
+        # Define Ponding Load Cells
+        PondingLoadManager = PondingLoadManager2d()
+        for i in range(self.ndiv):
+            y_offsetI = 0.
+            y_offsetJ = 0.
+
+            if self.use_CBDI:
+                # I end
+                if i == 0:
+                    endI = ('node',0)
+                else:
+                    endI = ('element',0,i/self.ndiv)
+                    y_offsetI = camber(i/self.ndiv,self.L,self.c)
+                # J end
+                if i == (self.ndiv-1):
+                    endJ = ('node',1)
+                else:
+                    endJ = ('element',0,(i+1)/self.ndiv)
+                    y_offsetJ = camber((i+1)/self.ndiv,self.L,self.c)
+            else:
+                endI = ('node',i)
+                endJ = ('node',i+1)
+
+            PondingLoadManager.add_cell(i,endI,endJ,self.gamma,self.S)
+            PondingLoadManager.cells[i].endI.y_offset = y_offsetI 
+            PondingLoadManager.cells[i].endJ.y_offset = y_offsetJ
+            PondingLoadManager.cells[i].update_coord()
+                
+        # Define Dead Load
+        ops.timeSeries("Constant", self.dead_load_ts_tag)
+        ops.pattern("Plain", self.dead_load_pattern_tag, self.dead_load_ts_tag)
+
+        # Define uniform dead load on joists
+        for i in range(self.nele):
+            nodes = ops.eleNodes(i)
+            coordi = ops.nodeCoord(nodes[0])
+            coordj = ops.nodeCoord(nodes[1])
+            Lx = coordj[0]-coordi[0]
+            Ly = coordj[1]-coordi[1]
+            L = sqrt(Lx**2 + Ly**2)
+            Wy = -self.qD*self.S*(Lx/L)*(Lx/L)
+            Wx = -self.qD*self.S*(Lx/L)*(Ly/L)
+            ops.eleLoad('-ele', i, '-type', '-beamUniform', Wy, Wx)
+
+        # Initilize data
+        results = AnalysisResults()
+        results.water_volume = np.zeros((self.num_steps_zw+1,1))
+        results.water_level = np.zeros((self.num_steps_zw+1,1))
+        results.Rxi = np.zeros((self.num_steps_zw+1,1))
+        results.Ryi = np.zeros((self.num_steps_zw+1,1))
+        results.Ryj = np.zeros((self.num_steps_zw+1,1))
+        
+        # Set up analysis
+        ops.numberer("RCM")
+        ops.constraints("Plain")
+        ops.system("BandSPD")
+        ops.test("NormUnbalance", 1.0e-4, 25, 1)
+        ops.algorithm("Newton")
+        ops.integrator("LoadControl", 1.0)
+        ops.analysis("Static")
+        tic = time.perf_counter()
+        ops.analyze(1)
+        toc = time.perf_counter()
+        results.add_to_analysis_time(tic,toc)
+        ops.reactions()
+
+        # Find lowest point
+        yo = self.lowest_point()
+    
+        # Store Reuslts
+        results.water_volume[0] = 0.
+        results.water_level[0] = yo
+        results.Rxi[0] = self.Rxi()
+        results.Ryi[0] = self.Ryi()
+        results.Ryj[0] = self.Ryj()
+
+        # Run Ponding Analysis
+        ops.timeSeries("Constant", self.ponding_load_ts_tag)
+        for iStep in range(1,self.num_steps_zw+1):
+
+            # Update ponding load cells
+            if self.include_ponding_effect:
+                PondingLoadManager.update()
+
+            # Compute load vector
+            izw = yo + (iStep/self.num_steps_zw)*(self.zw-yo)
+            (iV,idVdz) = PondingLoadManager.get_volume(izw)
+            PondingLoadManager.compute_current_load_vector(izw)
+
+            # Apply difference to model
+            ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+            PondingLoadManager.apply_load_increment()
+            PondingLoadManager.commit_current_load_vector()
+
+            # Run analysis
+            tic = time.perf_counter()
+            ops.analyze(1)
+            toc = time.perf_counter()
+            results.add_to_analysis_time(tic,toc)
+            ops.reactions()
+
+            # Store Reuslts
+            results.water_volume[iStep] = iV
+            results.water_level[iStep] = izw
+            results.Rxi[iStep] = self.Rxi()
+            results.Ryi[iStep] = self.Ryi()
+            results.Ryj[iStep] = self.Ryj()
+
+        results.print_total_analysis_time()
+
+        return results
+
+    def Rxi(self):
+        R = ops.nodeReaction(0, 1)
+        return R        
+        
+    def Ryi(self):
+        if self.yi_fixed:
+            R = ops.nodeReaction(0, 2)
+        else:
+            R = ops.nodeReaction(1001, 2)
+        return R
+
+    def Ryj(self):
+        if self.yj_fixed:
+            R = ops.nodeReaction(self.nele, 2)
+        else:
+            R = ops.nodeReaction(1002, 2)
+        return R
+ 
+class ExampleRoof(ExampleStructure):
 
     # Bay Widths
     L_AB = 480
@@ -77,12 +341,9 @@ class ExampleRoof:
     zw      = -6
 
     # Analysis Options
-    use_CBDI = False
-    include_ponding_effect = True
     ndiv_J  = 10
     na      = 4
     nb      = 4
-    element_type = 'dispBeamColumn'
     num_steps_zw = 1000
     # @todo add analysis options
     #   1. path analysis, ramping up volume and simple step incremental
