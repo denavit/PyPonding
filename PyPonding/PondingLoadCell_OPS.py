@@ -12,6 +12,8 @@ except ImportError:
 
 
 class NodeEnd2d:
+    y_offset = 0.
+
     def __init__(self,node_id):
         self.node_id = node_id
        
@@ -20,7 +22,7 @@ class NodeEnd2d:
         
     def coord(self):
         x = ops.nodeCoord(self.node_id,1)
-        y = ops.nodeCoord(self.node_id,2)
+        y = ops.nodeCoord(self.node_id,2) + self.y_offset
         return (x,y)
     
     def disp(self):
@@ -29,6 +31,8 @@ class NodeEnd2d:
         return (dx,dy)
     
 class ElementEnd2d:
+    y_offset = 0.
+    
     def __init__(self,element_id,x):
         self.element_id = element_id
         self.nodes = ops.eleNodes(element_id)
@@ -43,7 +47,7 @@ class ElementEnd2d:
         xJ = ops.nodeCoord(self.nodes[1],1)
         yJ = ops.nodeCoord(self.nodes[1],2)
         x = xI + self.x*(xJ-xI)
-        y = yI + self.x*(yJ-yI)
+        y = yI + self.x*(yJ-yI) + self.y_offset
         return (x,y)
     
     def disp(self):
@@ -83,12 +87,7 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
         self.tw = tw
         
         # Retreive Coordinates
-        x,y = self.endI.coord()
-        self.xI = x
-        self.yI = y
-        x,y = self.endJ.coord()
-        self.xJ = x
-        self.yJ = y
+        self.update_coord()
         
         # Store node ids (if attached to nodes) for backwards compatibility 
         if isinstance(self.endI, NodeEnd2d):
@@ -99,6 +98,10 @@ class PondingLoadCell2d_OPS(PondingLoadCell2d):
             self.nodeJ = self.endJ.node_id
         else:
             self.nodeJ = None        
+        
+    def update_coord(self):
+        self.xI, self.yI = self.endI.coord()
+        self.xJ, self.yJ = self.endJ.coord()
         
     def update(self):
         # Code currently only updates y postion of nodes - @todo maybe update x position also
