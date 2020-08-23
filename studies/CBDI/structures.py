@@ -124,7 +124,7 @@ class ExampleRoof:
         else:
             return self.ndiv_J
 
-    def BuildModel(self):
+    def RunAnalysis(self):
 
         z_position = dict()
 

@@ -9,9 +9,9 @@ roof.include_ponding_effect = False
 
 # Run analyses
 roof.use_CBDI = False
-results1 = roof.BuildModel()
+results1 = roof.RunAnalysis()
 roof.use_CBDI = True
-results2 = roof.BuildModel()
+results2 = roof.RunAnalysis()
 
 # Plot results
 fig = plt.figure()
