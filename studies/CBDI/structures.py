@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import openseespy.opensees as ops
 import time
-from math import atan2,pi,pow,sqrt
+from math import atan2,pi,pow,sqrt,ceil
 from mpl_toolkits.mplot3d import Axes3D
 from PyPonding import PondingLoadManager2d,PondingLoadManager3d
 
@@ -35,6 +35,7 @@ class ExampleStructure:
     use_CBDI = False
     include_ponding_effect = True
     _element_type_override = None
+    print_each_analysis_time_increment = False
     
     def __init__(self):
         pass   
@@ -56,11 +57,9 @@ class ExampleStructure:
 class ExampleBeam(ExampleStructure):
 
     # Geometric Properties
-    L   = 480
-    yi  = 0
-    yj  = 6
-    c   = 1
-    S   = 60.
+    yi  = 0.
+    yj  = 0.
+    c   = 0.
     
     # Support Spring Stiffnessnes
     yi_fixed = True
@@ -70,25 +69,29 @@ class ExampleBeam(ExampleStructure):
     kyj = 0.
     kxj = 0.
 
-    # Cross Sctional Properties 
-    E   = 29000
-    A   = 100.
-    I   = 215.
+    # Material Properties 
+    material_type = 'Hardening'
+    hardening_ratio = 0.001      # Ratio of hardening stiffness to elastic stiffness
+    residual_stress_ratio = -0.3 # Ratio of peak compressive residual stress to yield stress (should be negative)
+    num_regions_RS = 10          # Number of regions for the discretization of residual stress
 
+    # Cross-Sectional Properties
+    _A  = None  # Area override
+    _Iz = None  # Moment of inertia override
+    
     # Loads
-    qD      = 10./1000/12**2 # Uniform dead load (forcer per unit area, downward positive)
     gamma   = 62.4/1000/12**3
-    zw      = 6
 
     # Analysis Options
-    ndiv  = 10
-    num_steps_zw = 1000
+    ndiv = 10
     transf_type = 'Linear'
+    num_fiber = 20       # Nominal number of fibers along depth of section
+    percent_drop = 20    # Percent drop in simple step volume analysis to halt analysis
+    tol_volume = 0.1     # Tolerance for volume iterations
+    max_iter_volume = 30 # Maximum number of volume iterations
+    _nIP = None          # Number of integration points override
     
-    # @todo add analysis options
-    #   1. path analysis, ramping up volume and simple step incremental
-    #   2. lumped analysis, going directly to zw and iterating
-    
+    # Tags    
     transf_tag  = 1
     section_tag = 1
     beamint_tag = 1
@@ -97,8 +100,16 @@ class ExampleBeam(ExampleStructure):
     ponding_load_pattern_tag_start = 2
     ponding_load_ts_tag = 2  
     
-    def __init__(self):
-        pass  
+    def __init__(self,d,tw,bf,tf,Fy,E,L,S,qD):
+        self.d = d              # Section Depth
+        self.tw = tw            # Thickness of the web
+        self.bf = bf            # Width of the flange
+        self.tf = tf            # Thickness of the flnage
+        self.Fy = Fy            # Yield stress
+        self.E = E              # Elastic modulus
+        self.L = L              # Member length
+        self.S = S              # Member spacing (tributary width)
+        self.qD = qD            # Uniform dead load (forcer per unit area, downward positive)
  
     def lowest_point(self):
         yo = float('inf')
@@ -115,8 +126,136 @@ class ExampleBeam(ExampleStructure):
         else:
             return self.ndiv
 
-    def RunAnalysis(self):
+    @property
+    def nIP(self):
+        if self._nIP is None:
+            if self.use_CBDI:
+                return 8
+            else:
+                return 4
+        else:
+            return self._nIP
 
+    @nIP.setter
+    def nIP(self, value):
+        self._nIP = value
+
+    @property
+    def dw(self):
+        dw = self.d-2*self.tf
+        return dw
+    
+    @property
+    def A(self):
+        if self._A is None:
+            return 2*self.bf*self.tf + (self.d-2*self.tf)*self.tw
+        else: 
+            return self._A
+    
+    @A.setter
+    def A(self, value):
+        self._A = value
+       
+    @property
+    def Iz(self):
+        if self._Iz is None:
+            return (1.0/12)*self.bf*self.d**3 - (1.0/12)*(self.bf-self.tw)*self.dw**3
+        else:
+            return self._Iz
+
+    @Iz.setter
+    def Iz(self, value):
+        self._Iz = value
+
+    def define_fiber_section(self,secTag,matTag):
+        Nfw = ceil(self.dw*(self.num_fiber/self.d))
+        Nff = ceil(self.tf*(self.num_fiber/self.d))
+        
+        Hk = self.hardening_ratio*self.E
+        
+        if self.residual_stress_ratio == 0 or self.material_type == 'Elastic':
+            if self.material_type == 'Elastic':
+                ops.uniaxialMaterial('Elastic', matTag, self.E)
+            elif self.material_type == 'ElasticPP':
+                ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E)
+            elif self.material_type == 'Steel01':
+                b = Hk/(self.E+Hk)
+                ops.uniaxialMaterial('Steel01', matTag, self.Fy, self.E, b)
+            elif self.material_type == 'Hardening':
+                ops.uniaxialMaterial('Hardening', matTag, self.E, self.Fy, 0.0, Hk)
+            else:
+                raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            
+            ops.section('WFSection2d',secTag,matTag,self.d,self.tw,self.bf,self.tf,Nfw,Nff)
+        else: 
+            ops.section('Fiber', secTag)    
+        
+            frc = self.residual_stress_ratio*self.Fy
+            frt = -frc*(self.bf*self.tf)/(self.bf*self.tf+self.tw*self.dw)
+            
+            # Define web fibers
+            if self.material_type == 'ElasticPP':
+                ops.uniaxialMaterial('ElasticPP', matTag, self.E, self.Fy/self.E, -self.Fy/self.E, frt/self.E)
+            elif self.material_type == 'Steel01':
+                b = Hk/(self.E+Hk)
+                ops.uniaxialMaterial('Steel01', matTag+1, self.Fy, self.E, b)
+                ops.uniaxialMaterial('InitStressMaterial', matTag , matTag+1, frt)
+            elif self.material_type == 'Hardening':
+                ops.uniaxialMaterial('Hardening', matTag+1, self.E, self.Fy, 0.0, Hk)
+                ops.uniaxialMaterial('InitStressMaterial', matTag , matTag+1, frt)
+            else:
+                raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            ops.patch('rect', matTag, Nfw, 1, -self.dw/2, -self.tw/2, self.dw/2, self.tw/2)
+                      
+            # Define flange fibers
+            region_width = self.bf/self.num_regions_RS
+            for i in range(self.num_regions_RS):
+                fri = frc + ((i+0.5)/self.num_regions_RS)*(frt-frc)
+            
+                matTagi = matTag+2*(i+1)
+                if self.material_type == 'ElasticPP':
+                    ops.uniaxialMaterial('ElasticPP', matTagi, self.E, self.Fy/self.E, -self.Fy/self.E, fri/self.E)
+                elif self.material_type == 'Steel01':
+                    b = Hk/(self.E+Hk)
+                    ops.uniaxialMaterial('Steel01', matTagi+1, self.Fy, self.E, b)
+                    ops.uniaxialMaterial('InitStressMaterial', matTagi , matTagi+1, fri)
+                elif self.material_type == 'Hardening':
+                    ops.uniaxialMaterial('Hardening', matTagi+1, self.E, self.Fy, 0.0, Hk)
+                    ops.uniaxialMaterial('InitStressMaterial', matTagi , matTagi+1, fri)
+                else:
+                    raise Exception('Input Error - unknown material type (%s)' % self.material_type)
+            
+                ops.patch('rect', matTagi, Nff, 1, self.dw/2, -region_width/2,   self.d/2, region_width/2)
+                ops.patch('rect', matTagi, Nff, 1, -self.d/2, -region_width/2, -self.dw/2, region_width/2)
+        return
+
+    def RunAnalysis(self,analysis_type,target_zw=None,target_Vw=None,num_steps=None):
+
+        if analysis_type.lower() == 'simplesteplevel':
+            # Path analysis, ramping up level using a simple step incremental procedure
+            if num_steps == None:
+                raise Exception('num_steps required for simple step level analysis')
+            if target_zw == None:
+                raise Exception('target_zw required for simple step level analysis')
+     
+        elif analysis_type.lower() == 'simplestepvolume':
+            # Path analysis, ramping up volume using a simple step incremental procedure
+            if num_steps == None:
+                raise Exception('num_steps required for simple step volume analysis')
+            if target_Vw == None:
+                raise Exception('target_Vw required for simple step volume analysis')        
+             
+        elif analysis_type.lower() == 'iterativelevel':
+            # Lumped analysis, going directly to zw and iterating
+            if target_zw == None:
+                raise Exception('target_zw required for simple step level analysis')
+            
+            raise Exception('Iterative level analysis not yet implemented')
+            
+        else:
+            raise Exception('Unknown analysis type: %s' % analysis_type)
+
+        # Create OpenSees model
         ops.wipe()
         ops.model('basic', '-ndm', 2, '-ndf', 3)
 
@@ -158,8 +297,11 @@ class ExampleBeam(ExampleStructure):
             
         # Define elements
         ops.geomTransf(self.transf_type, self.transf_tag)
-        ops.section('Elastic', self.section_tag, self.E, self.A, self.I)
-        ops.beamIntegration('Lobatto', self.beamint_tag, self.section_tag, 4)
+        if self.material_type.lower() == 'elasticsection':
+            ops.section('Elastic', self.section_tag, self.E, self.A, self.Iz)
+        else:
+            self.define_fiber_section(self.section_tag,1)
+        ops.beamIntegration('Lobatto', self.beamint_tag, self.section_tag, self.nIP)
         for i in range(self.nele):
             ops.element(self.element_type, i, i, i+1, self.transf_tag, self.beamint_tag)
 
@@ -209,17 +351,14 @@ class ExampleBeam(ExampleStructure):
 
         # Initilize data
         results = AnalysisResults()
-        results.water_volume = np.zeros((self.num_steps_zw+1,1))
-        results.water_level = np.zeros((self.num_steps_zw+1,1))
-        results.Rxi = np.zeros((self.num_steps_zw+1,1))
-        results.Ryi = np.zeros((self.num_steps_zw+1,1))
-        results.Ryj = np.zeros((self.num_steps_zw+1,1))
+        results.print_each_analysis_time_increment = self.print_each_analysis_time_increment
+        results.analysis_type = analysis_type     
         
         # Set up analysis
         ops.numberer("RCM")
         ops.constraints("Plain")
         ops.system("BandSPD")
-        ops.test("NormUnbalance", 1.0e-4, 25, 1)
+        ops.test("NormUnbalance", 1.0e-4, 25, 0)
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
         ops.analysis("Static")
@@ -229,47 +368,132 @@ class ExampleBeam(ExampleStructure):
         results.add_to_analysis_time(tic,toc)
         ops.reactions()
 
-        # Find lowest point
-        yo = self.lowest_point()
-    
-        # Store Reuslts
-        results.water_volume[0] = 0.
-        results.water_level[0] = yo
-        results.Rxi[0] = self.Rxi()
-        results.Ryi[0] = self.Ryi()
-        results.Ryj[0] = self.Ryj()
-
         # Run Ponding Analysis
         ops.timeSeries("Constant", self.ponding_load_ts_tag)
-        for iStep in range(1,self.num_steps_zw+1):
+        
+        if analysis_type.lower() == 'simplesteplevel':
 
-            # Update ponding load cells
-            if self.include_ponding_effect:
-                PondingLoadManager.update()
+            # Initialize results
+            results.target_zw = target_zw
+            results.water_volume = np.zeros((num_steps+1,1))
+            results.water_level = np.zeros((num_steps+1,1))
+            results.Rxi = np.zeros((num_steps+1,1))
+            results.Ryi = np.zeros((num_steps+1,1))
+            results.Ryj = np.zeros((num_steps+1,1))  
 
-            # Compute load vector
-            izw = yo + (iStep/self.num_steps_zw)*(self.zw-yo)
-            (iV,idVdz) = PondingLoadManager.get_volume(izw)
-            PondingLoadManager.compute_current_load_vector(izw)
+            # Find lowest point
+            yo = self.lowest_point()
 
-            # Apply difference to model
-            ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
-            PondingLoadManager.apply_load_increment()
-            PondingLoadManager.commit_current_load_vector()
+            # Store dead load results
+            results.water_volume[0] = 0.
+            results.water_level[0] = yo
+            results.Rxi[0] = self.Rxi()
+            results.Ryi[0] = self.Ryi()
+            results.Ryj[0] = self.Ryj()
+        
+            for iStep in range(1,num_steps+1):
 
-            # Run analysis
-            tic = time.perf_counter()
-            ops.analyze(1)
-            toc = time.perf_counter()
-            results.add_to_analysis_time(tic,toc)
-            ops.reactions()
+                # Update ponding load cells
+                if self.include_ponding_effect:
+                    PondingLoadManager.update()
 
-            # Store Reuslts
-            results.water_volume[iStep] = iV
-            results.water_level[iStep] = izw
-            results.Rxi[iStep] = self.Rxi()
-            results.Ryi[iStep] = self.Ryi()
-            results.Ryj[iStep] = self.Ryj()
+                # Compute load vector
+                izw = yo + (iStep/num_steps)*(target_zw-yo)
+                (iV,idVdz) = PondingLoadManager.get_volume(izw)
+                PondingLoadManager.compute_current_load_vector(izw)
+
+                # Apply difference to model
+                ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+                PondingLoadManager.apply_load_increment()
+                PondingLoadManager.commit_current_load_vector()
+
+                # Run analysis
+                tic = time.perf_counter()
+                ops.analyze(1)
+                toc = time.perf_counter()
+                results.add_to_analysis_time(tic,toc)
+                ops.reactions()
+
+                # Store Reuslts
+                results.water_volume[iStep] = iV
+                results.water_level[iStep] = izw
+                results.Rxi[iStep] = self.Rxi()
+                results.Ryi[iStep] = self.Ryi()
+                results.Ryj[iStep] = self.Ryj()
+                
+        elif analysis_type.lower() == 'simplestepvolume':
+        
+            # Initialize results
+            results.target_Vw = target_Vw
+            results.water_volume = np.zeros((num_steps+1,1))
+            results.water_level = np.zeros((num_steps+1,1))
+            results.Rxi = np.zeros((num_steps+1,1))
+            results.Ryi = np.zeros((num_steps+1,1))
+            results.Ryj = np.zeros((num_steps+1,1))  
+
+            # Find lowest point
+            yo = self.lowest_point()
+            
+            # Store dead load results
+            results.water_volume[0] = 0.
+            results.water_level[0] = yo
+            results.Rxi[0] = self.Rxi()
+            results.Ryi[0] = self.Ryi()
+            results.Ryj[0] = self.Ryj()
+        
+            for iStep in range(1,num_steps+1):
+
+                # Update ponding load cells
+                if self.include_ponding_effect:
+                    PondingLoadManager.update()
+
+                # Estimate water height
+                step_Vw = (iStep+1)/num_steps*target_Vw
+                if iStep == 1:
+                    izw = yo+0.1 # Initial guess
+                for i in range(self.max_iter_volume):
+                    (iV,idVdz) = PondingLoadManager.get_volume(izw)
+                    izw = izw - (iV-step_Vw)/idVdz
+                    if abs(iV-step_Vw) <= self.tol_volume:
+                        break 
+
+                # Compute load vector
+                PondingLoadManager.compute_current_load_vector(izw)
+
+                # Apply difference to model
+                ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+                PondingLoadManager.apply_load_increment()
+                PondingLoadManager.commit_current_load_vector()
+
+                # Run analysis
+                tic = time.perf_counter()
+                ops.analyze(1)
+                toc = time.perf_counter()
+                results.add_to_analysis_time(tic,toc)
+                ops.reactions()
+
+                # Store Reuslts
+                results.water_volume[iStep] = step_Vw
+                results.water_level[iStep] = izw
+                results.Rxi[iStep] = self.Rxi()
+                results.Ryi[iStep] = self.Ryi()
+                results.Ryj[iStep] = self.Ryj()
+            
+                # Stop analysis if water level too low
+                if (izw-yo) <= (1-0.01*self.percent_drop)*(np.amax(results.water_level)-yo):
+                    # Truncate remainging results and break out of stepping loop
+                    results.water_volume = results.water_volume[:(iStep+1)]
+                    results.water_level = results.water_level[:(iStep+1)]
+                    results.Rxi = results.Rxi[:(iStep+1)]
+                    results.Ryi = results.Ryi[:(iStep+1)]
+                    results.Ryj = results.Ryj[:(iStep+1)]
+                    break            
+            
+        elif analysis_type.lower() == 'iterativelevel':
+            raise Exception('Iterative level analysis not yet implemented')
+            
+        else:
+            raise Exception('Unknown analysis type: %s' % analysis_type)
 
         results.print_total_analysis_time()
 
