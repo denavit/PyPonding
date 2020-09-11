@@ -90,6 +90,7 @@ class ExampleBeam(ExampleStructure):
     tol_volume = 0.1     # Tolerance for volume iterations
     max_iter_volume = 30 # Maximum number of volume iterations
     _nIP = None          # Number of integration points override
+    test_flag = 0        # Print flag for OpenSees test object
     
     # Tags    
     transf_tag  = 1
@@ -358,7 +359,7 @@ class ExampleBeam(ExampleStructure):
         ops.numberer("RCM")
         ops.constraints("Plain")
         ops.system("BandSPD")
-        ops.test("NormUnbalance", 1.0e-4, 25, 0)
+        ops.test("NormUnbalance", 1.0e-4, 25, self.test_flag)
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
         ops.analysis("Static")
