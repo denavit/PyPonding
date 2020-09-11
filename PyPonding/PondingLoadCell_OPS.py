@@ -51,10 +51,7 @@ class ElementEnd2d:
         return (x,y)
     
     def disp(self):
-        import warnings
-        warnings.warn('PondingLoadCell not fully implemented for ends within and element. Displacement will be returned as zero.')
-        dx = 0.
-        dy = ops.cbdiDisplacement(self.element_id,self.x)
+        dx,dy,dz = ops.cbdiDisplacement(self.element_id,self.x)
         return (dx,dy)
 
 def define_end(arg):
@@ -246,11 +243,7 @@ class ElementVertex3d:
         return (x,y,z)
     
     def disp(self):
-        import warnings
-        warnings.warn('PondingLoadCell not fully implemented for ends within and element. Displacement will be returned as zero.')
-        dx = 0.
-        dy = 0.
-        dz = 0.
+        dx,dy,dz = ops.cbdiDisplacement(self.element_id,self.x)
         return (dx,dy,dz)
 
 class FixedVertex3d:
