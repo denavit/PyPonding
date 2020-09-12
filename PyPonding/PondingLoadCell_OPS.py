@@ -197,6 +197,22 @@ class PondingLoadManager2d:
             ele_angle = atan2(yJ-yI, xJ-xI)
             ops.eleLoad('-ele', i[0], '-type', '-beamPoint', fy*cos(ele_angle), i[1], fy*sin(ele_angle))
 
+    def total_current_load(self):
+        F = 0.
+        for i in self.committed_nodal_loads:        
+            F -= self.current_nodal_loads[i]
+        for i in self.committed_element_loads:
+            F -= self.current_element_loads[i]
+        return F
+    
+    def sub_abs_diff_load_increment(self):
+        diff = 0.
+        for i in self.committed_nodal_loads:        
+            diff += abs(self.current_nodal_loads[i] - self.committed_nodal_loads[i])
+        for i in self.committed_element_loads:
+            diff += abs(self.current_element_loads[i] - self.committed_element_loads[i])
+        return diff
+
 
 class NodeVertex3d:
     z_offset = 0.
@@ -472,4 +488,19 @@ class PondingLoadManager3d:
             Lxy = sqrt((xJ-xI)**2 + (yJ-yI)**2)
             ele_angle = atan2(Lz, Lxy)
             ops.eleLoad('-ele', i[0], '-type', '-beamPoint', fy*cos(ele_angle), 0.0, i[1], fy*sin(ele_angle))
+
+    def total_current_load(self):
+        F = 0.
+        for i in self.committed_nodal_loads:        
+            F -= self.current_nodal_loads[i]
+        for i in self.committed_element_loads:
+            F -= self.current_element_loads[i]
+        return F
     
+    def sub_abs_diff_load_increment(self):
+        diff = 0.
+        for i in self.committed_nodal_loads:        
+            diff += abs(self.current_nodal_loads[i] - self.committed_nodal_loads[i])
+        for i in self.committed_element_loads:
+            diff += abs(self.current_element_loads[i] - self.committed_element_loads[i])
+        return diff

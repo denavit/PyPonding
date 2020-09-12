@@ -34,25 +34,11 @@ class ExampleStructure:
     # Common Properties
     use_CBDI = False
     include_ponding_effect = True
-    _element_type_override = None
     print_each_analysis_time_increment = False
+    test_flag = 0        # Print flag for OpenSees test object
     
     def __init__(self):
-        pass   
-  
-    @property
-    def element_type(self):
-        if self._element_type_override is None:
-            if self.use_CBDI:
-                return 'forceBeamColumn'
-            else:
-                return 'dispBeamColumn'
-        else:
-            return self._element_type_override
-
-    @element_type.setter
-    def element_type(self, value):
-        self._element_type_override = value
+        pass
 
 class ExampleBeam(ExampleStructure):
 
@@ -90,7 +76,7 @@ class ExampleBeam(ExampleStructure):
     tol_volume = 0.1     # Tolerance for volume iterations
     max_iter_volume = 30 # Maximum number of volume iterations
     _nIP = None          # Number of integration points override
-    test_flag = 0        # Print flag for OpenSees test object
+    _element_type_override = None
     
     # Tags    
     transf_tag  = 1
@@ -140,6 +126,20 @@ class ExampleBeam(ExampleStructure):
     @nIP.setter
     def nIP(self, value):
         self._nIP = value
+
+    @property
+    def element_type(self):
+        if self._element_type_override is None:
+            if self.use_CBDI:
+                return 'forceBeamColumn'
+            else:
+                return 'dispBeamColumn'
+        else:
+            return self._element_type_override
+
+    @element_type.setter
+    def element_type(self, value):
+        self._element_type_override = value
 
     @property
     def dw(self):
@@ -359,7 +359,7 @@ class ExampleBeam(ExampleStructure):
         ops.numberer("RCM")
         ops.constraints("Plain")
         ops.system("BandSPD")
-        ops.test("NormUnbalance", 1.0e-4, 25, self.test_flag)
+        ops.test("NormUnbalance", 1.0e-6, 25, self.test_flag)
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
         ops.analysis("Static")
@@ -563,17 +563,20 @@ class ExampleRoof(ExampleStructure):
     wdJG    = 50./1000/12 # Joist Girder self-weight (forcer per unit length, downward positive)
     qD      = 10./1000/12**2 # Uniform dead load (forcer per unit area, downward positive)
     gamma   = 62.4/1000/12**3
-    zw      = -6
 
     # Analysis Options
     ndiv_J  = 10
     na      = 4
     nb      = 4
-    num_steps_zw = 1000
-    # @todo add analysis options
-    #   1. path analysis, ramping up volume and simple step incremental
-    #   2. lumped analysis, going directly to zw and iterating
-
+    tol_volume = 0.1        # Tolerance for volume iterations
+    max_iter_volume = 30    # Maximum number of volume iterations
+    tol_load_level = 0.0001 # Tolerance for force in 'IterativeLevel' analyses
+    max_iter_level = 30     # Maximum number of iterations for 'IterativeLevel' analyses
+    _nIP_J = None           # Number of integration points override
+    nIP_JG = 4              # Number of integration points for Joist Girder
+    _element_type_J_override = None
+    element_type_JG = 'dispBeamColumn'
+    
     # Analysis Tags
     girder_transf_tag   = 1
     girder_section_tag  = 1
@@ -610,28 +613,71 @@ class ExampleRoof(ExampleStructure):
         else:
             return self.ndiv_J
 
-    def RunAnalysis(self):
+    @property
+    def nIP_J(self):
+        if self._nIP_J is None:
+            if self.use_CBDI:
+                return 8
+            else:
+                return 4
+        else:
+            return self._nIP_J
 
-        z_position = dict()
+    @nIP_J.setter
+    def nIP_J(self, value):
+        self._nIP_J = value
+        
+    @property
+    def element_type_J(self):
+        if self._element_type_J_override is None:
+            if self.use_CBDI:
+                return 'forceBeamColumn'
+            else:
+                return 'dispBeamColumn'
+        else:
+            return self._element_type_J_override
 
+    @element_type_J.setter
+    def element_type_J(self, value):
+        self._element_type_J_override = value        
+        
+    def RunAnalysis(self,analysis_type,target_zw=None,target_Vw=None,num_steps=None):
 
+        if analysis_type.lower() == 'simplesteplevel':
+            # Path analysis, ramping up level using a simple step incremental procedure
+            if num_steps == None:
+                raise Exception('num_steps required for simple step level analysis')
+            if target_zw == None:
+                raise Exception('target_zw required for simple step level analysis')
+     
+        elif analysis_type.lower() == 'simplestepvolume':
+            # Path analysis, ramping up volume using a simple step incremental procedure
+            if num_steps == None:
+                raise Exception('num_steps required for simple step volume analysis')
+            if target_Vw == None:
+                raise Exception('target_Vw required for simple step volume analysis')        
+             
+        elif analysis_type.lower() == 'iterativelevel':
+            # Lumped analysis, going directly to zw and iterating
+            if target_zw == None:
+                raise Exception('target_zw required for simple step level analysis')
+            
+        else:
+            raise Exception('Unknown analysis type: %s' % analysis_type)
+
+        # Create OpenSees model
         ops.wipe()
         ops.model('basic', '-ndm', 3, '-ndf', 6)
-
-        # Define objects for girders
-        girder_transf  = ops.geomTransf('Linear', self.girder_transf_tag, 0.0, -1.0, 0.0)
-        girder_section = ops.section('Elastic', self.girder_section_tag, self.E, self.A_JG, self.Iz_JG, self.Iy_JG, 1, self.GJ_JG)
-        girder_beamint = ops.beamIntegration('Lobatto', self.girder_beamint_tag, self.girder_section_tag, 4)
-
-        joist_transf   = ops.geomTransf('Linear', self.joist_transf_tag, 1.0, 0.0, 0.0)
-        joist_section  = ops.section('Elastic', self.joist_section_tag, self.E, self.A_J, self.Iz_J, self.Iy_J, 1, self.GJ_J)
-        joist_beamint  = ops.beamIntegration('Lobatto', self.joist_beamint_tag, self.joist_section_tag, 4)
-
 
         ###########################################################
         # Define Joist Girders
         ###########################################################
-
+        ops.geomTransf('Linear', self.girder_transf_tag, 0.0, -1.0, 0.0)
+        ops.section('Elastic', self.girder_section_tag, self.E, self.A_JG, self.Iz_JG, self.Iy_JG, 1, self.GJ_JG)
+        ops.beamIntegration('Lobatto', self.girder_beamint_tag, self.girder_section_tag, self.nIP_JG)
+        
+        z_position = dict()
+        
         # Define Joist Girder B12
         for i in range(self.nspaces+1):
             n = 110101+i
@@ -652,7 +698,7 @@ class ExampleRoof(ExampleStructure):
                 ops.fix(n,0,1,0,1,0,1)
 
         for i in range(self.nspaces):
-            ops.element(self.element_type, 110101+i, 110101+i, 110102+i, self.girder_transf_tag, self.girder_beamint_tag)
+            ops.element(self.element_type_JG, 110101+i, 110101+i, 110102+i, self.girder_transf_tag, self.girder_beamint_tag)
 
         # Define Joist Girder B23
         for i in range(self.nspaces+1):
@@ -674,7 +720,7 @@ class ExampleRoof(ExampleStructure):
                 ops.fix(n,0,1,0,1,0,1)
 
         for i in range(self.nspaces):
-            ops.element(self.element_type, 110201+i, 110201+i, 110202+i, self.girder_transf_tag, self.girder_beamint_tag)
+            ops.element(self.element_type_JG, 110201+i, 110201+i, 110202+i, self.girder_transf_tag, self.girder_beamint_tag)
 
         # Define Joist Girder C12
         for i in range(self.nspaces+1):
@@ -696,7 +742,7 @@ class ExampleRoof(ExampleStructure):
                 ops.fix(n,0,1,0,1,0,1)
 
         for i in range(self.nspaces):
-            ops.element(self.element_type, 120101+i, 120101+i, 120102+i, self.girder_transf_tag, self.girder_beamint_tag)
+            ops.element(self.element_type_JG, 120101+i, 120101+i, 120102+i, self.girder_transf_tag, self.girder_beamint_tag)
 
         # Define Joist Girder C23
         for i in range(self.nspaces+1):
@@ -718,13 +764,16 @@ class ExampleRoof(ExampleStructure):
                 ops.fix(n,0,1,0,1,0,1)
 
         for i in range(self.nspaces):
-            ops.element(self.element_type, 120201+i, 120201+i, 120202+i, self.girder_transf_tag, self.girder_beamint_tag)
+            ops.element(self.element_type_JG, 120201+i, 120201+i, 120202+i, self.girder_transf_tag, self.girder_beamint_tag)
 
 
         ###########################################################
         # Define Joists
         ##########################################################
-
+        ops.geomTransf('Linear', self.joist_transf_tag, 1.0, 0.0, 0.0)
+        ops.section('Elastic', self.joist_section_tag, self.E, self.A_J, self.Iz_J, self.Iy_J, 1, self.GJ_J)
+        ops.beamIntegration('Lobatto', self.joist_beamint_tag, self.joist_section_tag, self.nIP_J)
+        
         # Define joists between grid lines A and B
         for i in range(1,2*self.nspaces):
 
@@ -765,7 +814,7 @@ class ExampleRoof(ExampleStructure):
                     ops.fix(n,1,0,0,0,1,1)
 
             for j in range(self.nele_J):
-                ops.element(self.element_type, 210001+100*i+j, 210001+100*i+j, 210002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
+                ops.element(self.element_type_J, 210001+100*i+j, 210001+100*i+j, 210002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
 
 
         # Define joists between grid lines B and C
@@ -814,7 +863,7 @@ class ExampleRoof(ExampleStructure):
                     ops.fix(n,1,0,0,0,1,1)
 
             for j in range(self.nele_J):
-                ops.element(self.element_type, 220001+100*i+j, 220001+100*i+j, 220002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
+                ops.element(self.element_type_J, 220001+100*i+j, 220001+100*i+j, 220002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
 
 
         # Define joists between grid lines C and D
@@ -857,7 +906,7 @@ class ExampleRoof(ExampleStructure):
                     ops.fix(n,1,0,0,0,1,1)
 
             for j in range(self.nele_J):
-                ops.element(self.element_type, 230001+100*i+j, 230001+100*i+j, 230002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
+                ops.element(self.element_type_J, 230001+100*i+j, 230001+100*i+j, 230002+100*i+j, self.joist_transf_tag, self.joist_beamint_tag)
 
 
         ###########################################################
@@ -1327,15 +1376,14 @@ class ExampleRoof(ExampleStructure):
 
         # Initilize data
         results = AnalysisResults()
-        results.water_volume = np.zeros((self.num_steps_zw+1,1))
-        results.water_level  = np.zeros((self.num_steps_zw+1,1))
-        results.col_react_B2 = np.zeros((self.num_steps_zw+1,1))
+        results.print_each_analysis_time_increment = self.print_each_analysis_time_increment
+        results.analysis_type = analysis_type
         
         # Set up analysis
         ops.numberer("RCM")
         ops.constraints("Plain")
         ops.system("BandSPD")
-        ops.test("NormUnbalance", 1.0e-4, 25, 1)
+        ops.test("NormUnbalance", 1.0e-6, 25, self.test_flag)
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
         ops.analysis("Static")
@@ -1347,43 +1395,93 @@ class ExampleRoof(ExampleStructure):
 
         #print(ops.systemSize())
 
-        # Find lowest point
-        zo = self.lowest_point()
-    
-        # Store Reuslts
-        results.water_volume[0] = 0.
-        results.water_level[0]  = zo
-        results.col_react_B2[0] = self.ColumnReaction('B2')
+        if analysis_type.lower() == 'simplesteplevel':
 
-        # Run Ponding Analysis
-        ops.timeSeries("Constant", self.ponding_load_ts_tag)
-        for iStep in range(1,self.num_steps_zw+1):
+            # Initialize results
+            results.water_volume = np.zeros((num_steps+1,1))
+            results.water_level  = np.zeros((num_steps+1,1))
+            results.col_react_B2 = np.zeros((num_steps+1,1))
 
-            # Update ponding load cells
-            if self.include_ponding_effect:
-                PondingLoadManager.update()
+            # Find lowest point
+            zo = self.lowest_point()
+        
+            # Store Reuslts
+            results.water_volume[0] = 0.
+            results.water_level[0] = zo
+            results.col_react_B2[0] = self.ColumnReaction('B2')
 
-            # Compute load vector
-            izw = zo + (iStep/self.num_steps_zw)*(self.zw-zo)
-            (iV,idVdz) = PondingLoadManager.get_volume(izw)
-            PondingLoadManager.compute_current_load_vector(izw)
+            # Run Ponding Analysis
+            ops.timeSeries("Constant", self.ponding_load_ts_tag)
+            for iStep in range(1,num_steps+1):
 
-            # Apply difference to model
-            ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
-            PondingLoadManager.apply_load_increment()
-            PondingLoadManager.commit_current_load_vector()
+                # Update ponding load cells
+                if self.include_ponding_effect:
+                    PondingLoadManager.update()
 
-            # Run analysis
-            tic = time.perf_counter()
-            ops.analyze(1)
-            toc = time.perf_counter()
-            results.add_to_analysis_time(tic,toc)
-            ops.reactions()
+                # Compute load vector
+                izw = zo + (iStep/num_steps)*(target_zw-zo)
+                (iV,idVdz) = PondingLoadManager.get_volume(izw)
+                PondingLoadManager.compute_current_load_vector(izw)
+
+                # Apply difference to model
+                ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+                PondingLoadManager.apply_load_increment()
+                PondingLoadManager.commit_current_load_vector()
+
+                # Run analysis
+                tic = time.perf_counter()
+                ops.analyze(1)
+                toc = time.perf_counter()
+                results.add_to_analysis_time(tic,toc)
+                ops.reactions()
+
+                # Store Reuslts
+                results.water_volume[iStep] = iV
+                results.water_level[iStep]  = izw
+                results.col_react_B2[iStep] = self.ColumnReaction('B2')
+
+        elif analysis_type.lower() == 'simplestepvolume':
+            raise Exception('Simple step volume analysis not yet implemented')
+            
+        elif analysis_type.lower() == 'iterativelevel':
+
+            # Run Ponding Analysis
+            ops.timeSeries("Constant", self.ponding_load_ts_tag)
+            for iStep in range(1,self.max_iter_level+1):
+
+                # Update ponding load cells
+                if self.include_ponding_effect:
+                    PondingLoadManager.update()
+
+                # Compute load vector
+                PondingLoadManager.compute_current_load_vector(target_zw)
+
+                # Check for convergence
+                if PondingLoadManager.sub_abs_diff_load_increment() < self.tol_load_level:
+                    print('Converged')
+                    break
+                    
+                # Print data on iteration
+                print('Iteration: %3.i, Total Water Load: %0.3f' % (iStep,PondingLoadManager.total_current_load()))
+                    
+                # Apply difference to model
+                ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+                PondingLoadManager.apply_load_increment()
+                PondingLoadManager.commit_current_load_vector()
+
+                # Run analysis
+                tic = time.perf_counter()
+                ops.analyze(1)
+                toc = time.perf_counter()
+                results.add_to_analysis_time(tic,toc)
+                ops.reactions()
 
             # Store Reuslts
-            results.water_volume[iStep] = iV
-            results.water_level[iStep]  = izw
-            results.col_react_B2[iStep] = self.ColumnReaction('B2')
+            results.water_level  = target_zw
+            results.col_react_B2 = self.ColumnReaction('B2')
+            
+        else:
+            raise Exception('Unknown analysis type: %s' % analysis_type)
 
         results.print_total_analysis_time()
 

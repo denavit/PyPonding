@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 # Define roof
 roof = ExampleRoof()
 roof.num_steps_zw = 25
-roof.include_ponding_effect = False
+#roof.include_ponding_effect = False
 #roof.plot_load_cells = True
 
 # Run analyses
 roof.use_CBDI = False
-results1 = roof.RunAnalysis()
+results1 = roof.RunAnalysis('IterativeLevel',target_zw=6)
 roof.use_CBDI = True
-results2 = roof.RunAnalysis()
+results2 = roof.RunAnalysis('IterativeLevel',target_zw=6)
 
 # Plot results
 fig = plt.figure()
