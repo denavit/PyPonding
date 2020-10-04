@@ -32,7 +32,6 @@ class AnalysisResults:
 class ExampleStructure:
 
     # Common Properties
-    use_CBDI = False
     include_ponding_effect = True
     print_each_analysis_time_increment = False
     test_flag = 0        # Print flag for OpenSees test object
@@ -69,14 +68,18 @@ class ExampleBeam(ExampleStructure):
     gamma   = 62.4/1000/12**3
 
     # Analysis Options
-    ndiv = 10
+    num_elements = 10
+    num_divisions_per_element = 1
+    
     transf_type = 'Linear'
-    num_fiber = 20       # Nominal number of fibers along depth of section
-    percent_drop = 20    # Percent drop in simple step volume analysis to halt analysis
-    tol_volume = 0.1     # Tolerance for volume iterations
-    max_iter_volume = 30 # Maximum number of volume iterations
-    _nIP = None          # Number of integration points override
-    _element_type_override = None
+    num_fiber = 20          # Nominal number of fibers along depth of section
+    percent_drop = 20       # Percent drop in simple step volume analysis to halt analysis
+    tol_volume = 0.1        # Tolerance for volume iterations
+    max_iter_volume = 30    # Maximum number of volume iterations
+    tol_load_level = 0.0001 # Tolerance for force in 'IterativeLevel' analyses
+    max_iter_level = 30     # Maximum number of iterations for 'IterativeLevel' analyses
+    nIP = 3                 # Number of integration points override
+    element_type = 'dispBeamColumn'
     
     # Tags    
     transf_tag  = 1
@@ -107,39 +110,8 @@ class ExampleBeam(ExampleStructure):
         return yo
  
     @property
-    def nele(self):
-        if self.use_CBDI:
-            return 1
-        else:
-            return self.ndiv
-
-    @property
-    def nIP(self):
-        if self._nIP is None:
-            if self.use_CBDI:
-                return 8
-            else:
-                return 4
-        else:
-            return self._nIP
-
-    @nIP.setter
-    def nIP(self, value):
-        self._nIP = value
-
-    @property
-    def element_type(self):
-        if self._element_type_override is None:
-            if self.use_CBDI:
-                return 'forceBeamColumn'
-            else:
-                return 'dispBeamColumn'
-        else:
-            return self._element_type_override
-
-    @element_type.setter
-    def element_type(self, value):
-        self._element_type_override = value
+    def num_divisions(self):
+        return self.num_divisions_per_element*self.num_elements
 
     @property
     def dw(self):
@@ -251,8 +223,6 @@ class ExampleBeam(ExampleStructure):
             if target_zw == None:
                 raise Exception('target_zw required for simple step level analysis')
             
-            raise Exception('Iterative level analysis not yet implemented')
-            
         else:
             raise Exception('Unknown analysis type: %s' % analysis_type)
 
@@ -261,8 +231,8 @@ class ExampleBeam(ExampleStructure):
         ops.model('basic', '-ndm', 2, '-ndf', 3)
 
         # Define nodes
-        for i in range(self.nele+1):
-            xi = (i/self.nele)
+        for i in range(self.num_elements+1):
+            xi = (i/self.num_elements)
             x = xi*self.L
             y = self.yi + xi*(self.yj-self.yi) + camber(xi,self.L,self.c)
             ops.node(i,x,y)
@@ -278,23 +248,23 @@ class ExampleBeam(ExampleStructure):
             ops.element('zeroLength', 1001, 1001, 0, '-mat', 1001, '-dir', 2)
 
         if self.yj_fixed and self.xj_fixed:
-            ops.fix(self.nele,1,1,0)
+            ops.fix(self.num_elements,1,1,0)
         elif self.yj_fixed:
-            ops.fix(self.nele,0,1,0)
+            ops.fix(self.num_elements,0,1,0)
         elif self.xj_fixed:
-            ops.fix(self.nele,1,0,0)
+            ops.fix(self.num_elements,1,0,0)
         
         if (not self.yj_fixed) and (self.kyj != 0.):
             ops.node(1002,self.L,self.yj)
             ops.fix(1002,1,1,1)
             ops.uniaxialMaterial('Elastic', 1002, self.kyj)
-            ops.element('zeroLength', 1002, 1002, self.nele, '-mat', 1002, '-dir', 2)
+            ops.element('zeroLength', 1002, 1002, self.num_elements, '-mat', 1002, '-dir', 2)
         
         if (not self.xj_fixed) and (self.kxj != 0.):
             ops.node(1003,self.L,self.yj)
             ops.fix(1003,1,1,1)
             ops.uniaxialMaterial('Elastic', 1003, self.kxj)
-            ops.element('zeroLength', 1003, 1003, self.nele, '-mat', 1003, '-dir', 1)
+            ops.element('zeroLength', 1003, 1003, self.num_elements, '-mat', 1003, '-dir', 1)
             
         # Define elements
         ops.geomTransf(self.transf_type, self.transf_tag)
@@ -303,32 +273,42 @@ class ExampleBeam(ExampleStructure):
         else:
             self.define_fiber_section(self.section_tag,1)
         ops.beamIntegration('Lobatto', self.beamint_tag, self.section_tag, self.nIP)
-        for i in range(self.nele):
+        for i in range(self.num_elements):
             ops.element(self.element_type, i, i, i+1, self.transf_tag, self.beamint_tag)
 
         # Define Ponding Load Cells
         PondingLoadManager = PondingLoadManager2d()
-        for i in range(self.ndiv):
+        for i in range(self.num_divisions):
             y_offsetI = 0.
             y_offsetJ = 0.
 
-            if self.use_CBDI:
-                # I end
-                if i == 0:
-                    endI = ('node',0)
-                else:
-                    endI = ('element',0,i/self.ndiv)
-                    y_offsetI = camber(i/self.ndiv,self.L,self.c)
-                # J end
-                if i == (self.ndiv-1):
-                    endJ = ('node',1)
-                else:
-                    endJ = ('element',0,(i+1)/self.ndiv)
-                    y_offsetJ = camber((i+1)/self.ndiv,self.L,self.c)
+            # I end
+            if i % self.num_divisions_per_element == 0:
+                n = i//self.num_divisions_per_element
+                endI = ('node',n)
             else:
-                endI = ('node',i)
-                endJ = ('node',i+1)
-
+                e = i//self.num_divisions_per_element
+                x = (i%self.num_divisions_per_element)/self.num_divisions_per_element
+                endI = ('element',e,x)
+                if self.num_elements == 1 or self.c == 0:
+                    y_offsetI = camber(i/self.num_divisions,self.L,self.c)
+                else:
+                    raise Exception('Camber not yet implemnted for multiple elements')
+            
+            # J end
+            if (i+1) % self.num_divisions_per_element == 0:
+                n = (i+1)//self.num_divisions_per_element
+                endJ = ('node',n)
+            else:
+                e = (i+1)//self.num_divisions_per_element
+                x = ((i+1)%self.num_divisions_per_element)/self.num_divisions_per_element
+                endJ = ('element',e,x)
+                if self.num_elements == 1 or self.c == 0:
+                    y_offsetJ = camber((i+1)/self.num_divisions,self.L,self.c)
+                else:
+                    raise Exception('Camber not yet implemnted for multiple elements')
+            
+            # Add load cell
             PondingLoadManager.add_cell(i,endI,endJ,self.gamma,self.S)
             PondingLoadManager.cells[i].endI.y_offset = y_offsetI 
             PondingLoadManager.cells[i].endJ.y_offset = y_offsetJ
@@ -339,7 +319,7 @@ class ExampleBeam(ExampleStructure):
         ops.pattern("Plain", self.dead_load_pattern_tag, self.dead_load_ts_tag)
 
         # Define uniform dead load on joists
-        for i in range(self.nele):
+        for i in range(self.num_elements):
             nodes = ops.eleNodes(i)
             coordi = ops.nodeCoord(nodes[0])
             coordj = ops.nodeCoord(nodes[1])
@@ -353,7 +333,7 @@ class ExampleBeam(ExampleStructure):
         # Initilize data
         results = AnalysisResults()
         results.print_each_analysis_time_increment = self.print_each_analysis_time_increment
-        results.analysis_type = analysis_type     
+        results.analysis_type = analysis_type
         
         # Set up analysis
         ops.numberer("RCM")
@@ -491,7 +471,43 @@ class ExampleBeam(ExampleStructure):
                     break            
             
         elif analysis_type.lower() == 'iterativelevel':
-            raise Exception('Iterative level analysis not yet implemented')
+
+            for iStep in range(1,self.max_iter_level+1):
+
+                # Update ponding load cells
+                if self.include_ponding_effect:
+                    PondingLoadManager.update()
+
+                # Compute load vector
+                PondingLoadManager.compute_current_load_vector(target_zw)
+
+                # Check for convergence
+                if PondingLoadManager.sub_abs_diff_load_increment() < self.tol_load_level:
+                    print('Converged')
+                    break
+                    
+                # Print data on iteration
+                print('Iteration: %3.i, Total Water Load: %0.3f' % (iStep,PondingLoadManager.total_current_load()))
+                    
+                # Apply difference to model
+                ops.pattern("Plain", self.ponding_load_pattern_tag_start+iStep, self.ponding_load_ts_tag)
+                PondingLoadManager.apply_load_increment()
+                PondingLoadManager.commit_current_load_vector()
+
+                # Run analysis
+                tic = time.perf_counter()
+                ops.analyze(1)
+                toc = time.perf_counter()
+                results.add_to_analysis_time(tic,toc)
+                ops.reactions()
+
+            # Store Reuslts
+            (V,dVdz) = PondingLoadManager.get_volume(target_zw)
+            results.water_volume = V
+            results.water_level  = target_zw            
+            results.Rxi = self.Rxi()
+            results.Ryi = self.Ryi()
+            results.Ryj = self.Ryj()
             
         else:
             raise Exception('Unknown analysis type: %s' % analysis_type)
@@ -513,7 +529,7 @@ class ExampleBeam(ExampleStructure):
 
     def Ryj(self):
         if self.yj_fixed:
-            R = ops.nodeReaction(self.nele, 2)
+            R = ops.nodeReaction(self.num_elements, 2)
         else:
             R = ops.nodeReaction(1002, 2)
         return R
@@ -565,6 +581,7 @@ class ExampleRoof(ExampleStructure):
     gamma   = 62.4/1000/12**3
 
     # Analysis Options
+    use_CBDI = False    
     ndiv_J  = 10
     na      = 4
     nb      = 4
@@ -1382,7 +1399,7 @@ class ExampleRoof(ExampleStructure):
         # Set up analysis
         ops.numberer("RCM")
         ops.constraints("Plain")
-        ops.system("BandSPD")
+        ops.system("ProfileSPD")
         ops.test("NormUnbalance", 1.0e-6, 25, self.test_flag)
         ops.algorithm("Newton")
         ops.integrator("LoadControl", 1.0)
