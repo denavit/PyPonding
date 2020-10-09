@@ -22,7 +22,7 @@ class PondingLoadCell2d:
         pass
            
     def get_load_vector(self,z):
-        L  = self.xJ-self.xI;
+        L  = abs(self.xJ-self.xI);
         
         hI = z - (self.yI + self.dyI)
         hJ = z - (self.yJ + self.dyJ)
@@ -113,7 +113,7 @@ class PondingLoadCell2d:
         return f
         
     def get_volume(self,z):       
-        L  = self.xJ-self.xI;
+        L  = abs(self.xJ-self.xI);
         
         hI = z - (self.yI + self.dyI)
         hJ = z - (self.yJ + self.dyJ)
