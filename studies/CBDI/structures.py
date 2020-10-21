@@ -80,6 +80,7 @@ class ExampleBeam(ExampleStructure):
     max_iter_level = 30     # Maximum number of iterations for 'IterativeLevel' analyses
     nIP = 3                 # Number of integration points override
     element_type = 'dispBeamColumn'
+    beamint_type = 'Lobatto'
     
     # Tags    
     transf_tag  = 1
@@ -272,7 +273,22 @@ class ExampleBeam(ExampleStructure):
             ops.section('Elastic', self.section_tag, self.E, self.A, self.Iz)
         else:
             self.define_fiber_section(self.section_tag,1)
-        ops.beamIntegration('Lobatto', self.beamint_tag, self.section_tag, self.nIP)
+        if self.beamint_type == 'OpenNewtonCotes':
+            xi_list = [None]*self.nIP
+            for i in range(self.nIP):
+                xi_list[i] = (2*i+1)/(2*self.nIP)
+            sec_tag_list = [self.section_tag]*self.nIP
+            print(xi_list)
+            print(sec_tag_list) 
+            ops.beamIntegration('FixedLocation', self.beamint_tag, self.nIP, *sec_tag_list, *xi_list)
+        elif self.beamint_type == 'MidDistance':
+            xi_list = [None]*self.nIP
+            for i in range(self.nIP):
+                xi_list[i] = (2*i+1)/(2*self.nIP)
+            sec_tag_list = [self.section_tag]*self.nIP
+            ops.beamIntegration('MidDistance', self.beamint_tag, self.nIP, *sec_tag_list, *xi_list)
+        else:
+            ops.beamIntegration(self.beamint_type, self.beamint_tag, self.section_tag, self.nIP)
         for i in range(self.num_elements):
             ops.element(self.element_type, i, i, i+1, self.transf_tag, self.beamint_tag)
 
