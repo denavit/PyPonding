@@ -209,7 +209,7 @@ class wf:
         # define ponding load cells    
         PondingLoadCells = dict()
         for i in range(0,self.num_elements):
-            PondingLoadCells[i] = PondingLoadCell2d_OPS(id,i,i+1,self.gamma,self.TW)        
+            PondingLoadCells[i] = PondingLoadCell2d_OPS(i,i,i+1,self.gamma,self.TW)
         
         # Create dict of each node that can have ponding load applied and initilize load to zero
         EmptyPondingLoad = dict()
