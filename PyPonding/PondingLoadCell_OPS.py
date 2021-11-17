@@ -21,13 +21,14 @@ class NodeEnd2d:
         return self.node_id
         
     def coord(self):
-        x = ops.nodeCoord(self.node_id,1)
-        y = ops.nodeCoord(self.node_id,2) + self.y_offset
+        x,y = ops.nodeCoord(self.node_id)
+        y += self.y_offset
+        #x = ops.nodeCoord(self.node_id,1)
+        #y = ops.nodeCoord(self.node_id,2) + self.y_offset
         return (x,y)
     
     def disp(self):
-        dx = ops.nodeDisp(self.node_id,1)
-        dy = ops.nodeDisp(self.node_id,2)
+        dx,dy,rz = ops.nodeDisp(self.node_id)
         return (dx,dy)
     
 class ElementEnd2d:
@@ -42,10 +43,8 @@ class ElementEnd2d:
         return (self.element_id,round(self.x,6))
  
     def coord(self):
-        xI = ops.nodeCoord(self.nodes[0],1)
-        yI = ops.nodeCoord(self.nodes[0],2)
-        xJ = ops.nodeCoord(self.nodes[1],1)
-        yJ = ops.nodeCoord(self.nodes[1],2)
+        xI,yI = ops.nodeCoord(self.nodes[0])
+        xJ,yJ = ops.nodeCoord(self.nodes[1])
         x = xI + self.x*(xJ-xI)
         y = yI + self.x*(yJ-yI) + self.y_offset
         return (x,y)
@@ -224,15 +223,11 @@ class NodeVertex3d:
         return self.node_id
         
     def coord(self):
-        x = ops.nodeCoord(self.node_id,1)
-        y = ops.nodeCoord(self.node_id,2)
-        z = ops.nodeCoord(self.node_id,3) + self.z_offset
-        return (x,y,z)
+        x,y,z = ops.nodeCoord(self.node_id)
+        return (x,y,z+self.z_offset)
     
     def disp(self):
-        dx = ops.nodeDisp(self.node_id,1)
-        dy = ops.nodeDisp(self.node_id,2)
-        dz = ops.nodeDisp(self.node_id,3)
+        dx,dy,dz,rx,ry,rz = ops.nodeDisp(self.node_id)
         return (dx,dy,dz)
     
 class ElementVertex3d:
@@ -247,12 +242,8 @@ class ElementVertex3d:
         return (self.element_id,round(self.x,6))
  
     def coord(self):
-        xI = ops.nodeCoord(self.nodes[0],1)
-        yI = ops.nodeCoord(self.nodes[0],2)
-        zI = ops.nodeCoord(self.nodes[0],3)
-        xJ = ops.nodeCoord(self.nodes[1],1)
-        yJ = ops.nodeCoord(self.nodes[1],2)
-        zJ = ops.nodeCoord(self.nodes[1],3)
+        xI,yI,zI = ops.nodeCoord(self.nodes[0])
+        xJ,yJ,zJ = ops.nodeCoord(self.nodes[1])
         x = xI + self.x*(xJ-xI)
         y = yI + self.x*(yJ-yI)
         z = zI + self.x*(zJ-zI) + self.z_offset
