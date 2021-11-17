@@ -495,3 +495,33 @@ class PondingLoadManager3d:
         for i in self.committed_element_loads:
             diff += abs(self.current_element_loads[i] - self.committed_element_loads[i])
         return diff
+
+    def find_lowest_point(self):
+        zmin = float('inf')
+        
+        for i in self.cells:  
+            coord = self.cells[i].vertexI.coord()
+            disp  = self.cells[i].vertexI.disp()
+            z = coord[2]+disp[2]
+            if z < zmin:
+                zmin = z
+                
+            coord = self.cells[i].vertexJ.coord()
+            disp  = self.cells[i].vertexJ.disp()
+            z = coord[2]+disp[2]
+            if z < zmin:
+                zmin = z
+
+            coord = self.cells[i].vertexK.coord()
+            disp  = self.cells[i].vertexK.disp()
+            z = coord[2]+disp[2]
+            if z < zmin:
+                zmin = z
+
+            coord = self.cells[i].vertexL.coord()
+            disp  = self.cells[i].vertexL.disp()
+            z = coord[2]+disp[2]
+            if z < zmin:
+                zmin = z                
+                
+        return zmin
