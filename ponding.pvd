@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" compressor="vtkZLibDataCompressor">
+  <Collection>
+    <DataSet timestep="0.0000000000e+00" group="" part="0" file="ponding/ponding_T0.0000000000e+00_P0.vtu"/>
+    <DataSet timestep="0.0000000000e+00" group="" part="1" file="ponding/ponding_T0.0000000000e+00_P1.vtu"/>
+  </Collection>
+</VTKFile>
