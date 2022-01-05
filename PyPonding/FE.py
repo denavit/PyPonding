@@ -3,7 +3,7 @@ import scipy.sparse
 import scipy.sparse.linalg
 import matplotlib.pyplot as plt
 from math import hypot,sqrt
-from PyPonding import PondingLoadCell
+from . import PondingLoadCell
 
 import sys
 if(sys.version < '3'):

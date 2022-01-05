@@ -1,5 +1,5 @@
 from math import sin,cos,atan2,sqrt
-from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
+from . import PondingLoadCell2d, PondingLoadCell3d
 from . import opensees as ops
 
 class NodeEnd2d:
