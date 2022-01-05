@@ -3,7 +3,7 @@ from math import pi,ceil
 from PyPonding import PondingLoadCell2d_OPS
 from PyPonding.structures import steel_beam
 
-import openseespy.opensees as ops
+from .. import opensees as ops
 
 class wf:
     geomTransfType = 'Linear'
