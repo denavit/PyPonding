@@ -1,15 +1,6 @@
 from math import sin,cos,atan2,sqrt
-from PyPonding.PondingLoadCell import PondingLoadCell2d, PondingLoadCell3d
-
-try:
-    import opensees as ops
-except ImportError:
-    try:
-        import openseespy.opensees as ops
-    except ImportError:
-        import warnings
-        warnings.warn('OpenSeesPy not found. OpenSees functionality is not available.')
-
+from . import PondingLoadCell2d, PondingLoadCell3d
+from . import opensees as ops
 
 class NodeEnd2d:
     y_offset = 0.

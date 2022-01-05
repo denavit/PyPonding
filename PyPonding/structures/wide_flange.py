@@ -3,16 +3,7 @@ from math import pi, ceil
 from PyPonding import PondingLoadCell2d_OPS
 from PyPonding.structures import steel_beam
 
-try:
-    import opensees as ops
-except ImportError:
-    try:
-        import openseespy.opensees as ops
-    except ImportError:
-        import warnings
-        warnings.warn(
-            'OpenSeesPy not found. OpenSees functionality is not available.')
-
+from .. import opensees as ops
 
 class wf:
     geomTransfType = 'Corotational'
