@@ -1,227 +1,315 @@
-import opensees as ops
+import openseespy.opensees as ops
 from math import ceil
 import os
-import matplotlib.pyplot as plt
+import sys
+import numpy as np
 
-# Define units
-inch = 1.0
-kip = 1.0  # kip-mass
-sec = 1.0
-lb = kip/1000.0  # pound-mass
-ft = 12.0*inch
-in_per_ft = inch/ft
-m = 39.3701 * inch  # meter
-lbf = 32.174049 * lb*ft/sec**2  # pound-force
-kipf = 1000*lbf  # kip-force
-ksi = kipf/inch**2
-psf = lbf/ft**2
-pcf = psf/ft
 
-kg = 2.2046 * lb
-Newton = kg*m/sec**2
-Pa = Newton/m**2
-MPa = 1e6*Pa
+def PyPondingPFEM(waterHeightInch):
 
-# structure parameters
-Fy = 50.0*ksi
-E = 29000.0*ksi
-Hk = 1.0e-4*E
-TW = 10*ft
-shape_name = 'W14X22'
-L = 40*ft
-H = 20*ft
-slope = 0.0*in_per_ft
-qD = 20.0*psf
-gamma = 62.4*pcf
-wD = qD*TW
-shape = {'W': 22, 'A': 6.49, 'd': 13.7, 'ddet': 13.75, 'bf': 5, 'bfdet': 5, 'tw': 0.23, 'twdet': 0.25, 'twdet/2': 0.125, 'tf': 0.335, 'tfdet': 0.3125, 'kdes': 0.735, 'kdet': 1.0625, 'k1': 0.75, 'bf/2tf': 7.46, 'h/tw': 53.3, 'Ix': 199, 'Zx': 33.2, 'Sx': 29,
-         'rx': 5.54, 'Iy': 7, 'Zy': 4.39, 'Sy': 2.8, 'ry': 1.04, 'J': 0.208, 'Cw': 314, 'Wno': 16.7, 'Sw1': 7, 'Qf': 5.34, 'Qw': 16.1, 'rts': 1.27, 'ho': 13.4, 'PA': 41.3, 'PB': 46.3, 'PC': 32.4, 'PD': 37.4, 'T': 11.625, 'WGi': 2.75, 'metric_label': 'W360X32.9'}
+  # Define units
+  inch = 1.0
+  kipf = 1.0  # kip-force
+  sec = 1.0
+  lbf = kipf/1000.0  # pound-force
+  ft = 12.0*inch
+  in_per_ft = inch/ft
+  m = 39.3701 * inch  # meter
+  lb = lbf / (32.174049 * ft/sec**2) # pound-mass
+  kip = 1000*lbf  # kip-mass
+  ksi = kipf/inch**2
+  psf = lbf/ft**2
+  pcf = psf/ft
 
-num_elements = 100
-num_fiber = 20
-eleLen = L / num_elements
+  kg = 2.2046 * lb
+  Newton = kg*m/sec**2
+  Pa = Newton/m**2
+  MPa = 1e6*Pa
 
-# A = shape["A"] * inch**2
-d = shape["d"] * inch
-tw = shape["tw"] * inch
-bf = shape["bf"] * inch
-tf = shape["tf"] * inch
+  # structure parameters
+  Fy = 50.0*ksi
+  E = 29000.0*ksi
+  Hk = 1.0e-4*E
+  TW = 10*ft
+  shape_name = 'W14X22'
+  L = 40*ft
+  H = 20*ft
+  slope = 0.0*in_per_ft
+  qD = 20.0*psf
+  gamma = 62.4*pcf
+  wD = qD*TW
+  shape = {'W': 22, 'A': 6.49, 'd': 13.7, 'ddet': 13.75, 'bf': 5, 'bfdet': 5, 'tw': 0.23, 'twdet': 0.25, 'twdet/2': 0.125, 'tf': 0.335, 'tfdet': 0.3125, 'kdes': 0.735, 'kdet': 1.0625, 'k1': 0.75, 'bf/2tf': 7.46, 'h/tw': 53.3, 'Ix': 199, 'Zx': 33.2, 'Sx': 29,
+           'rx': 5.54, 'Iy': 7, 'Zy': 4.39, 'Sy': 2.8, 'ry': 1.04, 'J': 0.208, 'Cw': 314, 'Wno': 16.7, 'Sw1': 7, 'Qf': 5.34, 'Qw': 16.1, 'rts': 1.27, 'ho': 13.4, 'PA': 41.3, 'PB': 46.3, 'PC': 32.4, 'PD': 37.4, 'T': 11.625, 'WGi': 2.75, 'metric_label': 'W360X32.9'}
 
-# fluid parameters
-numx = 3.0
-numy = 3.0
+  eleLen = 5*inch
+  num_elements = L/eleLen
+  num_fiber = 5
+  print(f"eleLen = {eleLen}")
 
-rho = 1000.0 * kg/m**3
-mu = 0.0001 * Newton * sec/m**2
-b1 = 0.0
-b2 = -9.81 * m / sec**2
-thk = TW
-kappa = -1.0
+  A = shape["A"] * inch**2
+  I = shape["Ix"] * inch**4
+  d = shape["d"] * inch
+  tw = shape["tw"] * inch
+  bf = shape["bf"] * inch
+  tf = shape["tf"] * inch
 
-bmass = wD * eleLen / abs(b2)
+  # fluid parameters
+  numx = 3.0
+  numy = 3.0
 
-waterVolume = (6*inch)*L
+  rho = 1000.0 * kg/m**3
+  mu = 1.0 * Newton * sec/m**2
+  b1 = 0.0
+  b2 = -9.81 * m / sec**2
+  # print('rho =', rho)
+  # print('gamma =', gamma)
+  # print('gamma / g =', gamma/abs(b2))
+  # exit()
 
-# analysis parameters
-dtmax = 1e-3
-dtmin = 1e-3
-totaltime = 1.0
-filename = "ponding"
-ndf = 3
+  # print('b2 = ', b2/(inch/sec**2))
+  thk = TW
+  kappa = -1.0
 
-# model
-ops.wipe()
+  bmass = wD * eleLen / abs(b2)
 
-ops.model('basic', '-ndm', 2, '-ndf', ndf)
+  # waterVolume = waterHeightInch * inch*L
 
-# recorder
-ops.recorder('BgPVD', filename, 'disp', 'vel', 'pressure', '-dT', 1e-3)
-if not os.path.exists(filename):
-  os.makedirs(filename)
+  # analysis parameters
+  dtmax = 1e-3
+  dtmin = 1e-3
+  totaltime = 1e-3
+  filename = f"ponding-{waterHeightInch}in"
+  ndf = 3
 
-# wall mesh
-ops.node(1, 0.0, H)
-ops.node(2, 0.0, 0.0)
-ops.node(3, L, 0.0)
-ops.node(4, L, H)
+  # model
+  ops.wipe()
 
-ops.fix(2, 1, 1, 0)
-ops.fix(3, 1, 1, 0)
+  ops.model('basic', '-ndm', 2, '-ndf', ndf)
 
-sid = 1
-walltag1 = 1
-ops.mesh('line', walltag1, 2, 1, 2, sid, ndf, eleLen)
+  # wall mesh
+  ops.node(1, 0.0, H)
+  ops.node(2, 0.0, 0.0)
+  ops.node(3, L, 0.0)
+  ops.node(4, L, H)
 
-walltag2 = 2
-ops.mesh('line', walltag2, 2, 3, 4, sid, ndf, eleLen)
+  ops.fix(2, 1, 1, 0)
+  ops.fix(3, 0, 1, 0)
 
-wallNodes1 = ops.getNodeTags('-mesh', walltag1)
-wallNodes2 = ops.getNodeTags('-mesh', walltag2)
+  sid = 1
+  walltag1 = 1
+  ops.mesh('line', walltag1, 2, 1, 2, sid, ndf, eleLen)
 
-for nd in wallNodes1:
-  if nd != 2 and nd != 3:
-    ops.fix(nd, 1, 1, 1)
-for nd in wallNodes2:
-  if nd != 2 and nd != 3:
-    ops.fix(nd, 1, 1, 1)
+  walltag2 = 2
+  ops.mesh('line', walltag2, 2, 3, 4, sid, ndf, eleLen)
 
-# geom transf
-transfTag = 1
-ops.geomTransf('Corotational', transfTag)
+  wallNodes1 = ops.getNodeTags('-mesh', walltag1)
+  wallNodes2 = ops.getNodeTags('-mesh', walltag2)
 
-# material
-matTag = 1
-ops.uniaxialMaterial('Elastic', matTag, E)
+  for nd in wallNodes1:
+    if nd != 2 and nd != 3:
+      ops.fix(nd, 1, 1, 1)
+  for nd in wallNodes2:
+    if nd != 2 and nd != 3:
+      ops.fix(nd, 1, 1, 1)
 
-# section
-dw = d - 2*tf
-Nfw = ceil(dw*(num_fiber/d))
-Nff = ceil(tf*(num_fiber/d))
+  # geom transf
+  transfTag = 1
+  ops.geomTransf('Corotational', transfTag)
 
-secTag = 1
-ops.section('WFSection2d', secTag, matTag,
-            d, tw, bf, tf, Nfw, Nff)
+  # material
+  # matTag = 1
+  # ops.uniaxialMaterial('Elastic', matTag, E)
 
-# beam integration
-inteTag = 1
-Npts = 3
-ops.beamIntegration('Lobatto', inteTag, secTag, Npts)
+  # section
+  # dw = d - 2*tf
+  # Nfw = ceil(dw*(num_fiber/d))
+  # Nff = ceil(tf*(num_fiber/d))
 
-# beam mesh
-beamtag = 3
-eleArgs = ["dispBeamColumn", transfTag, inteTag]
-ops.mesh('line', beamtag, 2, 2, 3, sid, ndf, eleLen, *eleArgs)
+  secTag = 1
+  ops.section('Elastic', 1, E, A, I)
+  # ops.section('WFSection2d', secTag, matTag,
+  #             d, tw, bf, tf, Nfw, Nff)
 
-sNodes = ops.getNodeTags('-mesh', beamtag)
+  # beam integration
+  inteTag = 1
+  Npts = 3
+  ops.beamIntegration('Lobatto', inteTag, secTag, Npts)
 
-sEles = ops.getEleTags('-mesh', beamtag)
+  # beam mesh
+  beamtag = 3
+  eleArgs = ["dispBeamColumn", transfTag, inteTag]
+  ops.mesh('line', beamtag, 2, 2, 3, sid, ndf, eleLen, *eleArgs)
 
-tsTag = 1
-ops.timeSeries('Constant', tsTag)
+  sNodes = ops.getNodeTags('-mesh', beamtag)
 
-patternTag = 1
-ops.pattern('Plain', patternTag, tsTag)
-for ele in sEles:
-  ops.eleLoad('-ele', ele, '-type', 'beamUniform', -wD)
+  sEles = ops.getEleTags('-mesh', beamtag)
 
-# create constraint object
-ops.constraints('Plain')
+  tsTag = 1
+  ops.timeSeries('Constant', tsTag)
 
-# create numberer object
-ops.numberer('Plain')
+  patternTag = 1
+  ops.pattern('Plain', patternTag, tsTag)
+  for ele in sEles:
+    ops.eleLoad('-ele', ele, '-type', 'beamUniform', -wD)
 
-# create algorithm object
-ops.algorithm('Newton')
+  ops.rayleigh(1.0, 1.0, 0.0, 0.0)
 
-# create convergence test object
-ops.test('NormDispIncr', 1e-6, 100, 1)
+  # create constraint object
+  # ops.constraints('Plain')
 
-# create integrator object
-ops.integrator("LoadControl", 0.0)
+  # # create numberer object
+  # ops.numberer('Plain')
 
-# create SOE object
-ops.system("Mumps")
+  # # create algorithm object
+  # ops.algorithm('Newton')
 
-# create analysis object
-ops.analysis('Static')
+  # # create convergence test object
+  # ops.test('NormDispIncr', 1e-6, 100, 1)
 
-# run dead load analysis
-ops.analyze(1)
+  # # create integrator object
+  # ops.integrator("LoadControl", 0.0)
 
-for nd in sNodes:
-  print(f"node {nd}: {ops.nodeDisp(nd, 2)/inch}")
+  # # create SOE object
+  # ops.system("Mumps")
 
-# wipe analysis
-ops.wipeAnalysis()
-ops.loadConst('-time', 0.0)
+  # # create analysis object
+  # ops.analysis('Static')
 
-# add
-for nd in sNodes:
-  ops.mass(nd, bmass, bmass, 0.0)
+  # # run dead load analysis
+  # ops.analyze(1)
 
-# fluid mesh
-Lwater = 20*eleLen
-Hwater = waterVolume/Lwater
-nx = round(Lwater / eleLen * numx)
-ny = round(Hwater / eleLen * numy)
+  # locs = []
+  # disps = []
+  # for nd in [sNodes[0]] + sNodes[2:] + [sNodes[1]]:
+  #   locs.append(ops.nodeCoord(nd, 1)/ft)
+  #   disps.append(ops.nodeDisp(nd, 2))
 
-print(f'nx = {nx/numx}')
-print(f'ny = {ny/numy}')
+  # return locs, disps
 
-lower = [-L, -L]
-upper = [2 * L, 2 * H]
+  # wipe analysis
+  # ops.wipeAnalysis()
+  # ops.loadConst('-time', 0.0)
 
-eleArgs = ['PFEMElementBubble', rho, mu, b1, b2, thk, kappa]
-partArgs = ['quad', 0.5*L-Lwater/2.0, 0.0, 0.5*L+Lwater/2.0, 0.0,
-            0.5*L+Lwater/2.0, Hwater, 0.5*L-Lwater/2.0, Hwater, nx, ny]
-parttag = 4
-ops.mesh('part', parttag, *partArgs, *eleArgs)
+  # recorder
+  ops.recorder('BgPVD', filename, 'disp', 'vel', 'pressure', '-dT', 0.1)
+  if not os.path.exists(filename):
+    os.makedirs(filename)
 
-ops.mesh('bg', eleLen, *lower, *upper,
-         '-structure', sid, len(sNodes), *sNodes,
-         '-structure', sid, len(wallNodes1), *wallNodes1,
-         '-structure', sid, len(wallNodes2), *wallNodes2)
+  # add mass
+  for nd in sNodes:
+    ops.mass(nd, bmass, bmass, 0.0)
 
-# create constraint object
-ops.constraints('Plain')
+  # fluid mesh
+  # Lwater = round(0.2*L)*2*eleLen
+  # Hwater = waterVolume/Lwater
+  Lwater = L
+  Hwater = waterHeightInch
+  nx = round(Lwater / eleLen * numx)
+  ny = round(Hwater / eleLen * numy)
 
-# create numberer object
-ops.numberer('Plain')
+  print(f'nx = {nx/numx}')
+  print(f'ny = {ny/numy}')
 
-# create convergence test object
-ops.test('PFEM', 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 100, 3, 1, 2)
+  lower = [-L, -L]
+  upper = [2 * L, 2 * H]
 
-# create algorithm object
-ops.algorithm('Newton')
+  eleArgs = ['PFEMElementBubble', rho, mu, b1, b2, thk, kappa]
+  partArgs = ['quad', 0.5*L-Lwater/2.0, 0,
+              0.5*L+Lwater/2.0, 0,
+              0.5*L+Lwater/2.0, Hwater + 0,
+              0.5*L-Lwater/2.0, Hwater + 0, nx, ny]
+  parttag = 4
+  ops.mesh('part', parttag, *partArgs, *eleArgs)
 
-# create integrator object
-ops.integrator('PFEM', 0.5, 0.25)
+  ops.mesh('bg', eleLen, *lower, *upper,
+           '-structure', sid, len(sNodes), *sNodes,
+           '-structure', sid, len(wallNodes1), *wallNodes1,
+           '-structure', sid, len(wallNodes2), *wallNodes2)
 
-# create SOE object
-# system('PFEM')
-ops.system('PFEM', '-mumps')
+  # create constraint object
+  ops.constraints('Plain')
 
-# create analysis object
-ops.analysis('PFEM', dtmax, dtmin, b2)
+  # create numberer object
+  ops.numberer('Plain')
 
-ops.analyze()
+  # create convergence test object
+  ops.test('PFEM', 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 100, 3, 1, 2)
+
+  # create algorithm object
+  ops.algorithm('Newton')
+
+  # create integrator object
+  ops.integrator('PFEM', 0.5, 0.25)
+
+  # create SOE object
+  # system('PFEM')
+  ops.system('PFEM', '-mumps')
+
+  # create analysis object
+  ops.analysis('PFEM', dtmax, dtmin, b2)
+
+  while ops.getTime() < totaltime:
+    if ops.analyze() < 0:
+      raise RuntimeError(f"Analysis failed at {ops.getTime()}")
+
+    ops.remesh()
+
+  locs = []
+  disps = []
+  axial = []
+  shears = []
+  moments = []
+  axialMap = {}
+  shearMap = {}
+  momentMap = {}
+
+  for ele in sEles:
+    eleNodes = ops.eleNodes(ele)
+    eleForce = ops.eleDynamicalForce(ele)
+
+    if eleNodes[0] == 3:
+      # last element
+      eleNodes = [eleNodes[1], 3]
+      eleForce = [eleForce[3],eleForce[4],eleForce[5],eleForce[0],eleForce[1],eleForce[2]]
+
+    if len(eleNodes) != 2:
+      continue
+
+    print(eleNodes)
+    axialMap[eleNodes[0]] = -eleForce[0]
+    axialMap[eleNodes[1]] = eleForce[3]
+    shearMap[eleNodes[0]] = eleForce[1]
+    shearMap[eleNodes[1]] = -eleForce[4]
+    momentMap[eleNodes[0]] = -eleForce[2]
+    momentMap[eleNodes[1]] = eleForce[5]
+
+  for nd in [sNodes[0]] + sNodes[2:] + [sNodes[1]]:
+    locs.append(ops.nodeCoord(nd, 1)/ft)
+    disps.append(ops.nodeDisp(nd, 2))
+    axial.append(axialMap[nd])
+    shears.append(shearMap[nd])
+    moments.append(momentMap[nd])
+  
+  #   shears.append(ops.eleDynamicalForce)
+
+  return locs, disps, axial, shears, moments
+
+
+if __name__ == "__main__":
+  if len(sys.argv) < 2:
+    print("Required:", sys.argv[0], "waterHeightInch")
+    exit()
+
+  waterHeightInch = []
+  try:
+    for i in range(1, len(sys.argv)):
+      waterHeightInch.append(float(sys.argv[i]))
+  except:
+    print(f"Invalid waterHeightInch")
+
+  for height in waterHeightInch:
+    locs, disps, axial, shears, moments = PyPondingPFEM(height)
+    np.savetxt(f"disp-{height}in.txt", np.array([locs, disps]).T)
+    np.savetxt(f"axial-{height}in.txt", np.array([locs, axial]).T)
+    np.savetxt(f"shear-{height}in.txt", np.array([locs, shears]).T)
+    np.savetxt(f"moment-{height}in.txt", np.array([locs, moments]).T)
