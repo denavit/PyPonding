@@ -4,6 +4,56 @@ import os
 import sys
 import numpy as np
 
+def saveData(sNodes, sEles, zj, ft, inclTime):
+  locs = []
+  disps = []
+  axial = []
+  shears = []
+  moments = []
+  axialMap = {}
+  shearMap = {}
+  momentMap = {}
+
+  for ele in sEles:
+    eleNodes = ops.eleNodes(ele)
+    eleForce = ops.eleDynamicalForce(ele)
+
+    if eleNodes[0] == 3:
+      # last element
+      eleNodes = [eleNodes[1], 3]
+      eleForce = [eleForce[3],eleForce[4],eleForce[5],eleForce[0],eleForce[1],eleForce[2]]
+
+    if len(eleNodes) != 2:
+      continue
+
+    axialMap[eleNodes[0]] = -eleForce[0]
+    axialMap[eleNodes[1]] = eleForce[3]
+    shearMap[eleNodes[0]] = eleForce[1]
+    shearMap[eleNodes[1]] = -eleForce[4]
+    momentMap[eleNodes[0]] = -eleForce[2]
+    momentMap[eleNodes[1]] = eleForce[5]
+
+  for nd in [sNodes[0]] + sNodes[2:] + [sNodes[1]]:
+    locs.append(ops.nodeCoord(nd, 1)/ft)
+    disps.append(ops.nodeDisp(nd, 2))
+    axial.append(axialMap[nd])
+    shears.append(shearMap[nd])
+    moments.append(momentMap[nd])
+
+  time = ""
+  if inclTime:
+    time = f"-{ops.getTime():.3f}sec"
+  if zj <= 0:
+    np.savetxt(f"disp/disp-{height}in{time}.txt", np.array([locs, disps]).T)
+    np.savetxt(f"axial/axial-{height}in{time}.txt", np.array([locs, axial]).T)
+    np.savetxt(f"shear/shear-{height}in{time}.txt", np.array([locs, shears]).T)
+    np.savetxt(f"moment/moment-{height}in{time}sec.txt", np.array([locs, moments]).T)
+  else:
+    np.savetxt(f"disp/disp-{height}in-{zj}in{time}.txt", np.array([locs, disps]).T)
+    np.savetxt(f"axial/axial-{height}in-{zj}in{time}.txt", np.array([locs, axial]).T)
+    np.savetxt(f"shear/shear-{height}in-{zj}in{time}.txt", np.array([locs, shears]).T)
+    np.savetxt(f"moment/moment-{height}in-{zj}in{time}.txt", np.array([locs, moments]).T)
+
 def PyPondingPFEM(waterHeightInch, zj=0.0, prefix="ponding"):
 
   # Define units
@@ -52,8 +102,8 @@ def PyPondingPFEM(waterHeightInch, zj=0.0, prefix="ponding"):
   tf = shape["tf"] * inch
 
   # fluid parameters
-  numx = 6.0
-  numy = 6.0
+  numx = 5.0
+  numy = 5.0
 
   rho = 1000.0 * kg/m**3
   mu = 10.0 * Newton * sec/m**2
@@ -162,7 +212,7 @@ def PyPondingPFEM(waterHeightInch, zj=0.0, prefix="ponding"):
   # Lwater = round(0.2*L)*2*eleLen
   # Hwater = waterVolume/Lwater
   Lwater = L
-  Hwater = waterHeightInch + 0.5*zj
+  Hwater = waterHeightInch + zj*0.5
   nx = round(Lwater / eleLen * numx)
   ny = round(Hwater / eleLen * numy)
 
@@ -207,51 +257,20 @@ def PyPondingPFEM(waterHeightInch, zj=0.0, prefix="ponding"):
   # create analysis object
   ops.analysis('PFEM', dtmax, dtmin, b2)
 
+  counter = 0
   while ops.getTime() < totaltime:
     if ops.analyze() < 0:
       raise RuntimeError(f"Analysis failed at {ops.getTime()}")
 
     ops.remesh()
 
-  locs = []
-  disps = []
-  axial = []
-  shears = []
-  moments = []
-  axialMap = {}
-  shearMap = {}
-  momentMap = {}
+    if counter == 1000:
+      saveData(sNodes, sEles, zj, ft, inclTime=True)
+      counter = 0
+    else:
+      counter += 1
 
-  for ele in sEles:
-    eleNodes = ops.eleNodes(ele)
-    eleForce = ops.eleDynamicalForce(ele)
-
-    if eleNodes[0] == 3:
-      # last element
-      eleNodes = [eleNodes[1], 3]
-      eleForce = [eleForce[3],eleForce[4],eleForce[5],eleForce[0],eleForce[1],eleForce[2]]
-
-    if len(eleNodes) != 2:
-      continue
-
-    axialMap[eleNodes[0]] = -eleForce[0]
-    axialMap[eleNodes[1]] = eleForce[3]
-    shearMap[eleNodes[0]] = eleForce[1]
-    shearMap[eleNodes[1]] = -eleForce[4]
-    momentMap[eleNodes[0]] = -eleForce[2]
-    momentMap[eleNodes[1]] = eleForce[5]
-
-  for nd in [sNodes[0]] + sNodes[2:] + [sNodes[1]]:
-    locs.append(ops.nodeCoord(nd, 1)/ft)
-    disps.append(ops.nodeDisp(nd, 2))
-    axial.append(axialMap[nd])
-    shears.append(shearMap[nd])
-    moments.append(momentMap[nd])
-  
-  #   shears.append(ops.eleDynamicalForce)
-
-  return locs, disps, axial, shears, moments
-
+  saveData(sNodes, sEles, zj, ft, inclTime=False)
 
 if __name__ == "__main__":
   if len(sys.argv) < 2:
@@ -281,14 +300,4 @@ if __name__ == "__main__":
     exit()
 
   for height in waterHeightInch:
-    locs, disps, axial, shears, moments = PyPondingPFEM(height, zj, prefix)
-    if zj <= 0:
-      np.savetxt(f"disp-{height}in.txt", np.array([locs, disps]).T)
-      np.savetxt(f"axial-{height}in.txt", np.array([locs, axial]).T)
-      np.savetxt(f"shear-{height}in.txt", np.array([locs, shears]).T)
-      np.savetxt(f"moment-{height}in.txt", np.array([locs, moments]).T)
-    else:
-      np.savetxt(f"disp-{height}in-{zj}in.txt", np.array([locs, disps]).T)
-      np.savetxt(f"axial-{height}in-{zj}in.txt", np.array([locs, axial]).T)
-      np.savetxt(f"shear-{height}in-{zj}in.txt", np.array([locs, shears]).T)
-      np.savetxt(f"moment-{height}in-{zj}in.txt", np.array([locs, moments]).T)
+    PyPondingPFEM(height, zj, prefix)

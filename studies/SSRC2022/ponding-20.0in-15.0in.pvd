@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection" compressor="vtkZLibDataCompressor">
+  <Collection>
+    <DataSet timestep="0.0000000000e+00" group="" part="0" file="ponding-20.0in-15.0in/ponding-20.0in-15.0in_T0.0000000000e+00_P0.vtu"/>
+    <DataSet timestep="0.0000000000e+00" group="" part="1" file="ponding-20.0in-15.0in/ponding-20.0in-15.0in_T0.0000000000e+00_P1.vtu"/>
+    <DataSet timestep="0.0000000000e+00" group="" part="2" file="ponding-20.0in-15.0in/ponding-20.0in-15.0in_T0.0000000000e+00_P2.vtu"/>
+    <DataSet timestep="0.0000000000e+00" group="" part="3" file="ponding-20.0in-15.0in/ponding-20.0in-15.0in_T0.0000000000e+00_P3.vtu"/>
+  </Collection>
+</VTKFile>
