@@ -4,8 +4,7 @@ import os
 import sys
 import numpy as np
 
-
-def PyPondingPFEM(waterHeightInch):
+def PyPondingPFEM(waterHeightInch, zj=0.0, prefix="ponding"):
 
   # Define units
   inch = 1.0
@@ -44,7 +43,6 @@ def PyPondingPFEM(waterHeightInch):
   eleLen = 5*inch
   num_elements = L/eleLen
   num_fiber = 5
-  print(f"eleLen = {eleLen}")
 
   A = shape["A"] * inch**2
   I = shape["Ix"] * inch**4
@@ -54,19 +52,14 @@ def PyPondingPFEM(waterHeightInch):
   tf = shape["tf"] * inch
 
   # fluid parameters
-  numx = 3.0
-  numy = 3.0
+  numx = 6.0
+  numy = 6.0
 
   rho = 1000.0 * kg/m**3
-  mu = 1.0 * Newton * sec/m**2
+  mu = 10.0 * Newton * sec/m**2
   b1 = 0.0
   b2 = -9.81 * m / sec**2
-  # print('rho =', rho)
-  # print('gamma =', gamma)
-  # print('gamma / g =', gamma/abs(b2))
-  # exit()
 
-  # print('b2 = ', b2/(inch/sec**2))
   thk = TW
   kappa = -1.0
 
@@ -77,8 +70,10 @@ def PyPondingPFEM(waterHeightInch):
   # analysis parameters
   dtmax = 1e-3
   dtmin = 1e-3
-  totaltime = 1e-3
-  filename = f"ponding-{waterHeightInch}in"
+  totaltime = 100
+  filename = f"{prefix}-{waterHeightInch}in"
+  if zj > 0:
+    filename = f"{prefix}-{waterHeightInch}in-{zj}in"
   ndf = 3
 
   # model
@@ -89,7 +84,7 @@ def PyPondingPFEM(waterHeightInch):
   # wall mesh
   ops.node(1, 0.0, H)
   ops.node(2, 0.0, 0.0)
-  ops.node(3, L, 0.0)
+  ops.node(3, L, zj)
   ops.node(4, L, H)
 
   ops.fix(2, 1, 1, 0)
@@ -154,42 +149,6 @@ def PyPondingPFEM(waterHeightInch):
 
   ops.rayleigh(1.0, 1.0, 0.0, 0.0)
 
-  # create constraint object
-  # ops.constraints('Plain')
-
-  # # create numberer object
-  # ops.numberer('Plain')
-
-  # # create algorithm object
-  # ops.algorithm('Newton')
-
-  # # create convergence test object
-  # ops.test('NormDispIncr', 1e-6, 100, 1)
-
-  # # create integrator object
-  # ops.integrator("LoadControl", 0.0)
-
-  # # create SOE object
-  # ops.system("Mumps")
-
-  # # create analysis object
-  # ops.analysis('Static')
-
-  # # run dead load analysis
-  # ops.analyze(1)
-
-  # locs = []
-  # disps = []
-  # for nd in [sNodes[0]] + sNodes[2:] + [sNodes[1]]:
-  #   locs.append(ops.nodeCoord(nd, 1)/ft)
-  #   disps.append(ops.nodeDisp(nd, 2))
-
-  # return locs, disps
-
-  # wipe analysis
-  # ops.wipeAnalysis()
-  # ops.loadConst('-time', 0.0)
-
   # recorder
   ops.recorder('BgPVD', filename, 'disp', 'vel', 'pressure', '-dT', 0.1)
   if not os.path.exists(filename):
@@ -203,7 +162,7 @@ def PyPondingPFEM(waterHeightInch):
   # Lwater = round(0.2*L)*2*eleLen
   # Hwater = waterVolume/Lwater
   Lwater = L
-  Hwater = waterHeightInch
+  Hwater = waterHeightInch + 0.5*zj
   nx = round(Lwater / eleLen * numx)
   ny = round(Hwater / eleLen * numy)
 
@@ -275,7 +234,6 @@ def PyPondingPFEM(waterHeightInch):
     if len(eleNodes) != 2:
       continue
 
-    print(eleNodes)
     axialMap[eleNodes[0]] = -eleForce[0]
     axialMap[eleNodes[1]] = eleForce[3]
     shearMap[eleNodes[0]] = eleForce[1]
@@ -301,15 +259,36 @@ if __name__ == "__main__":
     exit()
 
   waterHeightInch = []
+  zj = 0.0
+  prefix = "ponding"
   try:
     for i in range(1, len(sys.argv)):
-      waterHeightInch.append(float(sys.argv[i]))
+      if zj is None:
+        zj = float(sys.argv[i])
+      elif prefix is None:
+        prefix = float(sys.argv[i])
+      elif sys.argv[i] == "-zj":
+        zj = None
+      elif sys.argv[i] == "-prefix":
+        prefix = None
+      else:
+        waterHeightInch.append(float(sys.argv[i]))
   except:
     print(f"Invalid waterHeightInch")
 
+  if zj is None or prefix is None:
+    print(f"no zj or prefix is given")
+    exit()
+
   for height in waterHeightInch:
-    locs, disps, axial, shears, moments = PyPondingPFEM(height)
-    np.savetxt(f"disp-{height}in.txt", np.array([locs, disps]).T)
-    np.savetxt(f"axial-{height}in.txt", np.array([locs, axial]).T)
-    np.savetxt(f"shear-{height}in.txt", np.array([locs, shears]).T)
-    np.savetxt(f"moment-{height}in.txt", np.array([locs, moments]).T)
+    locs, disps, axial, shears, moments = PyPondingPFEM(height, zj, prefix)
+    if zj <= 0:
+      np.savetxt(f"disp-{height}in.txt", np.array([locs, disps]).T)
+      np.savetxt(f"axial-{height}in.txt", np.array([locs, axial]).T)
+      np.savetxt(f"shear-{height}in.txt", np.array([locs, shears]).T)
+      np.savetxt(f"moment-{height}in.txt", np.array([locs, moments]).T)
+    else:
+      np.savetxt(f"disp-{height}in-{zj}in.txt", np.array([locs, disps]).T)
+      np.savetxt(f"axial-{height}in-{zj}in.txt", np.array([locs, axial]).T)
+      np.savetxt(f"shear-{height}in-{zj}in.txt", np.array([locs, shears]).T)
+      np.savetxt(f"moment-{height}in-{zj}in.txt", np.array([locs, moments]).T)

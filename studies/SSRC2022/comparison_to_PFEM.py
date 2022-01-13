@@ -33,11 +33,16 @@ zw = 2*inch
 qD = 20.0*psf
 gamma = 62.4*pcf
 zi = 0*inch
-zj = 0*inch
+zj = 20*inch
 
-height1 = 20.0
-height2 = 30.0
-height3 = 40.0
+if zj <= 0:
+  height1 = 20.0
+  height2 = 30.0
+  height3 = 40.0
+else:
+  height1 = 15.0
+  height2 = 20.0
+  height3 = 25.0
 
 VwM = (40.0*inch)*L*S
 Vw1 = (height1*inch)*L*S
@@ -72,9 +77,12 @@ line1, = plt.plot(results_PyPonding_ramp.water_volume/(L*S),results_PyPonding_ra
 plt.plot(results_PyPonding_vol1.water_volume/(L*S),results_PyPonding_vol1.water_level,'ro')
 plt.plot(results_PyPonding_vol2.water_volume/(L*S),results_PyPonding_vol2.water_level,'go')
 plt.plot(results_PyPonding_vol3.water_volume/(L*S),results_PyPonding_vol3.water_level,'bo')
-plt.plot(height1,10,'rx', markersize=5)
-plt.plot(height2,20,'gx', markersize=5)
-plt.plot(height3,25,'bx', markersize=5)
+if zj <= 0:
+  plt.plot(height1,10,'rx', markersize=5)
+  plt.plot(height2,20,'gx', markersize=5)
+  plt.plot(height3,25,'bx', markersize=5)
+else:
+  plt.title(f'Sloped Beam: zj = {zj} in')
 plt.legend((line1,line2), ('PyPonding', 'No Ponding Effect'),frameon=False)
 plt.xlabel('Normalized Water Volume, V/LS (in.)')
 plt.ylabel('Water Level (in.)')
@@ -89,12 +97,21 @@ fig.add_axes([0.15,0.20,0.80,0.75])
 line1, = plt.plot(results_PyPonding_vol1.position_along_length/ft,results_PyPonding_vol1.deflection_along_length/inch,'r-')
 line2, = plt.plot(results_PyPonding_vol2.position_along_length/ft,results_PyPonding_vol2.deflection_along_length/inch,'g-')
 line3, = plt.plot(results_PyPonding_vol3.position_along_length/ft,results_PyPonding_vol3.deflection_along_length/inch,'b-')
-disps1 = np.loadtxt(f"disp-{height1}in.txt")
-pfem1, = plt.plot(disps1[:,0],disps1[:,1],'r--',lw=3)
-disps2 = np.loadtxt(f"disp-{height2}in.txt")
-pfem2, = plt.plot(disps2[:,0],disps2[:,1],'g--',lw=3)
-disps3 = np.loadtxt(f"disp-{height3}in.txt")
-pfem3, = plt.plot(disps3[:,0],disps3[:,1],'b--',lw=3)
+if zj <= 0:
+  disps1 = np.loadtxt(f"disp/disp-{height1}in.txt")
+  pfem1, = plt.plot(disps1[:,0],disps1[:,1],'r--',lw=3)
+  disps2 = np.loadtxt(f"disp/disp-{height2}in.txt")
+  pfem2, = plt.plot(disps2[:,0],disps2[:,1],'g--',lw=3)
+  disps3 = np.loadtxt(f"disp/disp-{height3}in.txt")
+  pfem3, = plt.plot(disps3[:,0],disps3[:,1],'b--',lw=3)
+else:
+  disps1 = np.loadtxt(f"disp/disp-{height1}in-{zj}in.txt")
+  pfem1, = plt.plot(disps1[:,0],disps1[:,1],'r--',lw=3)
+  disps2 = np.loadtxt(f"disp/disp-{height2}in-{zj}in.txt")
+  pfem2, = plt.plot(disps2[:,0],disps2[:,1],'g--',lw=3)
+  disps3 = np.loadtxt(f"disp/disp-{height3}in-{zj}in.txt")
+  pfem3, = plt.plot(disps3[:,0],disps3[:,1],'b--',lw=3)
+  plt.title(f'Sloped Beam: zj = {zj} in')
 #plt.legend((line1, line2), ('PyPonding', 'No Ponding Effect'),frameon=False)
 plt.legend((line1, line2, line3, pfem1, pfem2, pfem3), ('Volume 1', 'Volume 2', 'Volume 3', 'PFEM 1', 'PFEM 2', 'PFEM 3'),frameon=False)
 plt.xlabel('Position Along Length of Beam (ft)')
@@ -112,12 +129,21 @@ fig.add_axes([0.15,0.20,0.80,0.75])
 line1, = plt.plot(results_PyPonding_vol1.position_along_length/ft,results_PyPonding_vol1.axial_load_along_length/inch,'r-')
 line2, = plt.plot(results_PyPonding_vol2.position_along_length/ft,results_PyPonding_vol2.axial_load_along_length/inch,'g-')
 line3, = plt.plot(results_PyPonding_vol3.position_along_length/ft,results_PyPonding_vol3.axial_load_along_length/inch,'b-')
-axials1 = np.loadtxt(f"axial-{height1}in.txt")
-pfem1, = plt.plot(axials1[:,0],axials1[:,1],'r--',lw=3)
-axials2 = np.loadtxt(f"axial-{height2}in.txt")
-pfem2, = plt.plot(axials2[:,0],axials2[:,1],'g--',lw=3)
-axials3 = np.loadtxt(f"axial-{height3}in.txt")
-pfem3, = plt.plot(axials3[:,0],axials3[:,1],'b--',lw=3)
+if zj <= 0:
+  axials1 = np.loadtxt(f"axial/axial-{height1}in.txt")
+  pfem1, = plt.plot(axials1[:,0],axials1[:,1],'r--',lw=3)
+  axials2 = np.loadtxt(f"axial/axial-{height2}in.txt")
+  pfem2, = plt.plot(axials2[:,0],axials2[:,1],'g--',lw=3)
+  axials3 = np.loadtxt(f"axial/axial-{height3}in.txt")
+  pfem3, = plt.plot(axials3[:,0],axials3[:,1],'b--',lw=3)
+else:
+  axials1 = np.loadtxt(f"axial/axial-{height1}in-{zj}in.txt")
+  pfem1, = plt.plot(axials1[:,0],axials1[:,1],'r--',lw=3)
+  axials2 = np.loadtxt(f"axial/axial-{height2}in-{zj}in.txt")
+  pfem2, = plt.plot(axials2[:,0],axials2[:,1],'g--',lw=3)
+  axials3 = np.loadtxt(f"axial/axial-{height3}in-{zj}in.txt")
+  pfem3, = plt.plot(axials3[:,0],axials3[:,1],'b--',lw=3)
+  plt.title(f'Sloped Beam: zj = {zj} in')
 plt.legend((line1, line2, line3, pfem1, pfem2, pfem3), ('Volume 1', 'Volume 2', 'Volume 3', 'PFEM 1', 'PFEM 2', 'PFEM 3'),frameon=False)
 #plt.legend((line1, line2), ('PyPonding', 'No Ponding Effect'),frameon=False)
 # plt.legend((line1, line2, line3), ('Volume 1', 'Volume 2', 'Volume 3'),frameon=False)
@@ -136,12 +162,22 @@ fig.add_axes([0.15,0.20,0.80,0.75])
 line1, = plt.plot(results_PyPonding_vol1.position_along_length/ft,results_PyPonding_vol1.shear_along_length/inch,'r-')
 line2, = plt.plot(results_PyPonding_vol2.position_along_length/ft,results_PyPonding_vol2.shear_along_length/inch,'g-')
 line3, = plt.plot(results_PyPonding_vol3.position_along_length/ft,results_PyPonding_vol3.shear_along_length/inch,'b-')
-shears1 = np.loadtxt(f"shear-{height1}in.txt")
-pfem1, = plt.plot(shears1[:,0],shears1[:,1],'r--',lw=3)
-shears2 = np.loadtxt(f"shear-{height2}in.txt")
-pfem2, = plt.plot(shears2[:,0],shears2[:,1],'g--',lw=3)
-shears3 = np.loadtxt(f"shear-{height3}in.txt")
-pfem3, = plt.plot(shears3[:,0],shears3[:,1],'b--',lw=3)
+if zj <= 0:
+  shears1 = np.loadtxt(f"shear/shear-{height1}in.txt")
+  pfem1, = plt.plot(shears1[:,0],shears1[:,1],'r--',lw=3)
+  shears2 = np.loadtxt(f"shear/shear-{height2}in.txt")
+  pfem2, = plt.plot(shears2[:,0],shears2[:,1],'g--',lw=3)
+  shears3 = np.loadtxt(f"shear/shear-{height3}in.txt")
+  pfem3, = plt.plot(shears3[:,0],shears3[:,1],'b--',lw=3)
+else:
+  shears1 = np.loadtxt(f"shear/shear-{height1}in-{zj}in.txt")
+  pfem1, = plt.plot(shears1[:,0],shears1[:,1],'r--',lw=3)
+  shears2 = np.loadtxt(f"shear/shear-{height2}in-{zj}in.txt")
+  pfem2, = plt.plot(shears2[:,0],shears2[:,1],'g--',lw=3)
+  shears3 = np.loadtxt(f"shear/shear-{height3}in-{zj}in.txt")
+  pfem3, = plt.plot(shears3[:,0],shears3[:,1],'b--',lw=3)
+  plt.title(f'Sloped Beam: zj = {zj} in')
+
 plt.legend((line1, line2, line3, pfem1, pfem2, pfem3), ('Volume 1', 'Volume 2', 'Volume 3', 'PFEM 1', 'PFEM 2', 'PFEM 3'),frameon=False)
 #plt.legend((line1, line2), ('PyPonding', 'No Ponding Effect'),frameon=False)
 # plt.legend((line1, line2, line3), ('Volume 1', 'Volume 2', 'Volume 3'),frameon=False)
@@ -160,12 +196,22 @@ fig.add_axes([0.15,0.20,0.80,0.75])
 line1, = plt.plot(results_PyPonding_vol1.position_along_length/ft,results_PyPonding_vol1.bending_moment_along_length/inch,'r-')
 line2, = plt.plot(results_PyPonding_vol2.position_along_length/ft,results_PyPonding_vol2.bending_moment_along_length/inch,'g-')
 line3, = plt.plot(results_PyPonding_vol3.position_along_length/ft,results_PyPonding_vol3.bending_moment_along_length/inch,'b-')
-moments1 = np.loadtxt(f"moment-{height1}in.txt")
-pfem1, = plt.plot(moments1[:,0],moments1[:,1],'r--',lw=3)
-moments2 = np.loadtxt(f"moment-{height2}in.txt")
-pfem2, = plt.plot(moments2[:,0],moments2[:,1],'g--',lw=3)
-moments3 = np.loadtxt(f"moment-{height3}in.txt")
-pfem3, = plt.plot(moments3[:,0],moments3[:,1],'b--',lw=3)
+if zj <= 0:
+  moments1 = np.loadtxt(f"moment/moment-{height1}in.txt")
+  pfem1, = plt.plot(moments1[:,0],moments1[:,1],'r--',lw=3)
+  moments2 = np.loadtxt(f"moment/moment-{height2}in.txt")
+  pfem2, = plt.plot(moments2[:,0],moments2[:,1],'g--',lw=3)
+  moments3 = np.loadtxt(f"moment/moment-{height3}in.txt")
+  pfem3, = plt.plot(moments3[:,0],moments3[:,1],'b--',lw=3)
+else:
+  moments1 = np.loadtxt(f"moment/moment-{height1}in-{zj}in.txt")
+  pfem1, = plt.plot(moments1[:,0],moments1[:,1],'r--',lw=3)
+  moments2 = np.loadtxt(f"moment/moment-{height2}in-{zj}in.txt")
+  pfem2, = plt.plot(moments2[:,0],moments2[:,1],'g--',lw=3)
+  moments3 = np.loadtxt(f"moment/moment-{height3}in-{zj}in.txt")
+  pfem3, = plt.plot(moments3[:,0],moments3[:,1],'b--',lw=3)
+  plt.title(f'Sloped Beam: zj = {zj} in')
+
 plt.legend((line1, line2, line3, pfem1, pfem2, pfem3), ('Volume 1', 'Volume 2', 'Volume 3', 'PFEM 1', 'PFEM 2', 'PFEM 3'),frameon=False)
 #plt.legend((line1, line2), ('PyPonding', 'No Ponding Effect'),frameon=False)
 # plt.legend((line1, line2, line3), ('Volume 1', 'Volume 2', 'Volume 3'),frameon=False)
