@@ -6,8 +6,8 @@ from PyPonding.structures import ElasticBeam2d
 from libdenavit.section.database import wide_flange_database
  
 # Plot settings
-plt.rc('text',usetex=False)
-plt.rc('font',family='sans-serif')
+plt.rc('text',usetex=True)
+plt.rc('font',family='serif')
 plt.rc('axes',labelsize=8)
 plt.rc('axes',titlesize=8)
 plt.rc('legend',fontsize=8)
@@ -30,7 +30,7 @@ L  = 40*ft
 S  = 10*ft
 E  = 29000.0*ksi
 zw = 2*inch
-qD = 10.0*psf
+qD = 20.0*psf
 gamma = 62.4*pcf
 
 ######################################
@@ -55,33 +55,31 @@ y_Silver = -wi/(2*gamma*S)*( (cos(fact*(0.5-x/L))/cos(fact*0.5) - 1) - (1 - cosh
 M_Silver = (wi*L**2)/(2*pi**2*C**0.5)*( cos(fact*(0.5-x/L))/cos(0.5*fact) - cosh(fact*(0.5-x/L))/cosh(0.5*fact) )
 
 # Plot Results
-fig = plt.figure(figsize=(3.50,2.50))
-ax = fig.add_axes([0.15,0.21,0.80,0.75])
+fig = plt.figure(figsize=(3.25,2.50))
+ax = fig.add_axes([0.15,0.15,0.80,0.82])
 line2, = plt.plot(x/ft,y_Silver/inch,'k-')
 line3, = plt.plot(x/ft,y_no_ponding/inch,'k--')
 line1, = plt.plot(results_OPS.position_along_length/ft,results_OPS.deflection_along_length/inch,'ko')
-plt.legend((line1, line2, line3), ('Numerical Results', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
-#plt.legend((line2, line3), ('Including Ponding Effect', 'No Ponding Effect'),frameon=False)
-plt.xlabel('Position Along Length of Beam (ft)')
-plt.ylabel('Displacement (in.)')
+plt.legend((line1, line2, line3), ('PyPonding', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
+plt.xlabel('Position along length of beam (ft)')
+plt.ylabel('Deflection (in.)')
 plt.xlim(0,L/ft)
-plt.ylim(-5,0)
-#plt.savefig('Figure_X1a.png',dpi=300)
-#plt.savefig('Figure_X1a.pdf')
+plt.ylim(-5.5,0)
+plt.savefig('Figure_4a.png',dpi=300)
+plt.savefig('Figure_4a.pdf')
 
-fig = plt.figure(figsize=(3.50,2.50))
-ax = fig.add_axes([0.15,0.21,0.80,0.75])
+fig = plt.figure(figsize=(3.25,2.50))
+ax = fig.add_axes([0.15,0.15,0.80,0.82])
 line2, = plt.plot(x/ft,M_Silver/kipft,'k-')
 line3, = plt.plot(x/ft,M_no_ponding/kipft,'k--')
 line1, = plt.plot(results_OPS.position_along_length/ft,results_OPS.bending_moment_along_length/kipft,'ko')
-plt.legend((line1, line2, line3), ('Numerical Results', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
-#plt.legend((line2, line3), ('Including Ponding Effect', 'No Ponding Effect'),frameon=False)
-plt.xlabel('Position Along Length of Beam (ft)')
-plt.ylabel('Bending Moment (kip-ft)')
+plt.legend((line1, line2, line3), ('PyPonding', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
+plt.xlabel('Position along length of beam (ft)')
+plt.ylabel('Bending moment (kip-ft)')
 plt.xlim(0,L/ft)
-plt.ylim(0,100)
-#plt.savefig('Figure_X1b.png',dpi=300)
-#plt.savefig('Figure_X1b.pdf')
+plt.ylim(0,110)
+plt.savefig('Figure_4b.png',dpi=300)
+plt.savefig('Figure_4b.pdf')
 
 
 ##########################################################
@@ -125,30 +123,30 @@ for i in range(len(C_list)):
     Mmax_list_Silver[i] = (wi*L**2)/(2*pi**2*C**0.5)*( cos(fact*(0.5-x/L))/cos(0.5*fact) - cosh(fact*(0.5-x/L))/cosh(0.5*fact) )
 
 # Plot Results
-fig = plt.figure(figsize=(3.50,2.50))
-ax = fig.add_axes([0.15,0.21,0.80,0.75])
+fig = plt.figure(figsize=(3.25,2.50))
+ax = fig.add_axes([0.15,0.15,0.80,0.82])
 line2, = plt.plot(C_list,ymax_list_Silver/inch,'k-')
 line3, = plt.plot(C_list,ymax_list_no_ponding/inch,'k--')
 line1, = plt.plot(C_list_OPS,ymax_list_OPS/inch,'ko')
-plt.legend((line1, line2, line3), ('Numerical Results', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
-plt.xlabel('Flexibility coefficient, C')
-plt.ylabel('Displacement at mid-span (in.)')
+plt.legend((line1, line2, line3), ('PyPonding', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
+plt.xlabel('Flexibility coefficient, $C$')
+plt.ylabel('Deflection at mid-span (in.)')
 plt.xlim(0.00,0.81)
-#plt.ylim(-5,0)
-#plt.savefig('Figure_X2a.png',dpi=300)
-#plt.savefig('Figure_X2a.pdf')
+plt.ylim(-32,2)
+plt.savefig('Figure_5a.png',dpi=300)
+plt.savefig('Figure_5a.pdf')
 
-fig = plt.figure(figsize=(3.50,2.50))
-ax = fig.add_axes([0.15,0.21,0.80,0.75])
+fig = plt.figure(figsize=(3.25,2.50))
+ax = fig.add_axes([0.15,0.15,0.80,0.82])
 line2, = plt.plot(C_list,Mmax_list_Silver/kipft,'k-')
 line3, = plt.plot(C_list,Mmax_list_no_ponding/kipft,'k--')
 line1, = plt.plot(C_list_OPS,Mmax_list_OPS/kipft,'ko')
-plt.legend((line1, line2, line3), ('Numerical Results', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
-plt.xlabel('Flexibility coefficient, C')
+plt.legend((line1, line2, line3), ('PyPonding', 'Closed-form Solution', 'No Ponding Effect'),frameon=False)
+plt.xlabel('Flexibility coefficient, $C$')
 plt.ylabel('Bending moment at mid-span (kip-ft)')
 plt.xlim(0.00,0.81)
-#plt.ylim(0,100)
-#plt.savefig('Figure_X2b.png',dpi=300)
-#plt.savefig('Figure_X2b.pdf')
+plt.ylim(0,340)
+plt.savefig('Figure_5b.png',dpi=300)
+plt.savefig('Figure_5b.pdf')
 
 plt.show()
