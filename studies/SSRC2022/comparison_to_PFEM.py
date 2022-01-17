@@ -90,7 +90,7 @@ if zj == 0*inch:
   line4, = plt.plot([],[],'x', color='grey', markersize=5) 
 elif zj == 20*inch:
   line3, = plt.plot(results_PyPonding_vol1.water_volume/(L*S),results_PyPonding_vol1.water_level,'bo')
-  line4, = plt.plot(normalized_volume1,0,'bx', markersize=5) # @todo - get the resulting height from the PFEM analysis
+  line4, = plt.plot(normalized_volume1,17,'bx', markersize=5)
 plt.legend((line1,line3,line4,line2), ('PyPonding', 'PyPonding', 'PFEM', 'No Ponding Effect'),frameon=False)
 plt.xlabel('Normalized Water Volume, $V/LS$ (in.)')
 plt.ylabel('Water Level (in.)')
