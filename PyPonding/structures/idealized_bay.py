@@ -31,8 +31,13 @@ class IdealizedBay:
         self.alpha                     = attrs['alpha']
         self.load_factor_dead          = attrs['load_factor_dead']    # Dead
         self.load_factor_ponding       = attrs['load_factor_ponding'] # Impounded Water
-        self.load_factor_snow1         = attrs['load_factor_snow1']   # Snow in Ponding Load Cell
-        self.load_factor_snow2         = attrs['load_factor_snow2']   # Snow as Simple Load
+        self.load_factor_snow          = attrs['load_factor_snow']    # Snow
+        self.consider_snow_and_water_overlap = attrs.get('consider_snow_and_water_overlap', True)
+
+        self.run_factored_analysis_after_ponding_analysis = attrs.get('run_factored_analysis_after_ponding_analysis', False)
+        self.additional_load_factor_dead    = attrs.get('additional_load_factor_dead', 1.0)
+        self.additional_load_factor_ponding = attrs.get('additional_load_factor_ponding', 1.0)
+        self.additional_load_factor_snow    = attrs.get('additional_load_factor_snow', 1.0)
 
         # Top of roof elevation
         self.z_TL = attrs['z_TL']
@@ -118,8 +123,10 @@ class IdealizedBay:
                 iCell.na      = self.num_subcell_X
                 iCell.nb      = self.num_subcell_Y
 
-                iCell.gammas  = self.alpha*self.load_factor_snow1*self.snow_density
-                iCell.hs      = self.snow_height
+                iCell.gammas  = self.snow_density
+                iCell.hs      = self.alpha*self.load_factor_snow*self.snow_height
+                
+                iCell.return_water_load_only = True
 
                 ponding_load_cells[i][j] = iCell
         
@@ -167,7 +174,7 @@ class IdealizedBay:
             if not self.include_ponding_effect:
                 break
             
-            sum_of_force = -self.alpha*self.load_factor_snow1*self.primary_member_span*self.secondary_member_span*self.snow_height*self.snow_density
+            sum_of_force = 0
             sum_of_diff  = 0
             for i in range(self.number_of_joist_spaces+1):
                 for j in range(self.num_ele_secondary+1):            
@@ -187,10 +194,20 @@ class IdealizedBay:
 
             if iteration == self.MAX_ITER-1:
                 print('The maximum number iterations has been reached without convergence')
-              
+                return None
+        
+        if self.run_factored_analysis_after_ponding_analysis:
+            # Perform analysis on secondary members
+            if self.analsis_engine.lower() == 'opensees':
+                analysis_results = self.run_static_analysis_OPS(ponding_load,use_additional_load_factors=True)
+            elif self.analsis_engine.lower() == 'fe':
+                analysis_results = self.run_static_analysis_FE(ponding_load,use_additional_load_factors=True)
+            else:
+                raise Exception(f'Unknown analysis engine {self.analsis_engine}')
+        
         return analysis_results
         
-    def run_static_analysis_FE(self,ponding_load):
+    def run_static_analysis_FE(self,ponding_load,use_additional_load_factors=False):
     
         # Initilize Results
         deflection                      = np.zeros((self.number_of_joist_spaces+1,self.num_ele_secondary+1))
@@ -277,7 +294,16 @@ class IdealizedBay:
         
             # Run secondary member analyses
             res = FE.LinearAnalysis(secondary_member_model)
-            res.run({'DEAD':self.alpha*self.load_factor_dead,'SNOW':self.alpha*self.load_factor_snow2,'PONDING':1.0})
+            if use_additional_load_factors:
+                res.run({
+                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'SNOW':self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
+                    'PONDING':self.additional_load_factor_ponding})
+            else:
+                res.run({
+                    'DEAD':self.alpha*self.load_factor_dead,
+                    'SNOW':self.alpha*self.load_factor_snow,
+                    'PONDING':1.0})
             
             # Get reactions (load on the primary members)
             primary_member_ponding_load_T[i] = -secondary_member_model.Nodes['n00'].dofs['UY'].react(res)
@@ -301,7 +327,14 @@ class IdealizedBay:
         
             # Run analyses
             res = FE.LinearAnalysis(primary_member_model)
-            res.run({'DEAD':self.alpha*self.load_factor_dead,'PONDING':1.0})
+            if use_additional_load_factors:
+                res.run({
+                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'PONDING':1.0})
+            else:
+                res.run({
+                    'DEAD':self.alpha*self.load_factor_dead,
+                    'PONDING':1.0})
             
             # Get member defelctions
             for i in range(self.number_of_joist_spaces+1):
@@ -321,7 +354,14 @@ class IdealizedBay:
         
             # Run analyses
             res = FE.LinearAnalysis(primary_member_model)
-            res.run({'DEAD':self.alpha*self.load_factor_dead,'PONDING':1.0})
+            if use_additional_load_factors:
+                res.run({
+                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'PONDING':1.0})
+            else:
+                res.run({
+                    'DEAD':self.alpha*self.load_factor_dead,
+                    'PONDING':1.0})
             
             # Get member defelctions
             for i in range(self.number_of_joist_spaces+1):
@@ -394,7 +434,10 @@ class IdealizedBay:
         
         return results
 
-    def run_static_analysis_OPS(self,ponding_load):
+    def run_static_analysis_OPS(self,ponding_load,use_additional_load_factors=False):
+    
+        if use_additional_load_factors:
+            raise Exception('Use of additional load factors is not yet implemented for OpenSees')
     
         # Initilize Results
         deflection                      = np.zeros((self.number_of_joist_spaces+1,self.num_ele_secondary+1))
@@ -436,7 +479,7 @@ class IdealizedBay:
 
             # Define load
             uniform_load = -self.alpha* \
-                (self.load_factor_dead*self.dead_load_uniform + self.load_factor_snow2*self.snow_density*self.snow_height)* \
+                (self.load_factor_dead*self.dead_load_uniform + self.load_factor_snow*self.snow_density*self.snow_height)* \
                 (self.primary_member_span/self.number_of_joist_spaces)*(self.secondary_member_span/self.num_ele_secondary)
                 
             ops.timeSeries("Constant", 1)
@@ -708,8 +751,7 @@ def run_example():
         'alpha': 1.0,
         'load_factor_dead':    1.0,
         'load_factor_ponding': 1.0,
-        'load_factor_snow1':   1.0,
-        'load_factor_snow2':   0.0,
+        'load_factor_snow':    1.0,
         'z_TL':  0*inch,
         'z_TR': 20*inch,
         'z_BL':  0*inch,

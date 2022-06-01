@@ -168,6 +168,8 @@ class PondingLoadCell3d:
     gammas  = 0     # Snow density
     hs      = 0     # Snow height
     
+    return_water_load_only = False
+    
     def __init__(self):
         pass
         
@@ -222,6 +224,12 @@ class PondingLoadCell3d:
                 else:
                     wpL = max(self.gamma,self.gammas)*self.hs + self.gamma*(hL-self.hs)                      
                     
+                if self.return_water_load_only:
+                    wpI = wpI - self.gammas*self.hs
+                    wpJ = wpJ - self.gammas*self.hs
+                    wpK = wpK - self.gammas*self.hs
+                    wpL = wpL - self.gammas*self.hs
+                    
                 wp = np.array([[wpI],[wpJ],[wpK],[wpL]])
             else:
                 wp = self.gamma*np.array([[max(0,hI)],[max(0,hJ)],[max(0,hK)],[max(0,hL)]])
@@ -263,6 +271,10 @@ class PondingLoadCell3d:
                                 wp_sub[i] = max(self.gamma,self.gammas)*h_sub + self.gammas*(self.hs-h_sub)
                             else:
                                 wp_sub[i] = max(self.gamma,self.gammas)*self.hs + self.gamma*(h_sub-self.hs)
+                                
+                            if self.return_water_load_only:
+                                wp_sub[i] = wp_sub[i] - self.gammas*self.hs    
+                                
                         else:
                             wp_sub[i] = self.gamma*max(0,h_sub)
                     
