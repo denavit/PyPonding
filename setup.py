@@ -5,6 +5,7 @@ setup(
 
     packages = [
         'PyPonding',
+        'PyPonding.Marino',
         'PyPonding.structures',
     ],
 )
