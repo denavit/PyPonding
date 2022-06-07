@@ -20,7 +20,7 @@ S       = 5*ft          # Tributary width
 E       = 29000.0*ksi   # Modulus of elasticity
 I       = 75*inch**4    # Moment of inertia
 gamma   = 62.4*pcf      # Unit weight of water
-qD      = 0*psf         # Dead loda
+qD      = 0*psf         # Dead load
 slope   = 0*in_per_ft # Beam slope
 zw      = 2*inch        # Elevation of water
 
@@ -31,7 +31,6 @@ beam.num_elements = 60
 
 # Run Ponding Analysis
 resultsP = beam.run_analysis_OPS('IterativeLevel',target_zw=zw)
-print(resultsP.shear_along_length)
 VmaxP = np.amax(np.absolute(resultsP.shear_along_length))
 MmaxP = np.amax(resultsP.bending_moment_along_length)
 x_at_MmaxP = resultsP.position_along_length[np.argmax(resultsP.bending_moment_along_length)]
@@ -61,20 +60,23 @@ plt.figure()
 plt.plot(resultsP.position_along_length,resultsP.bending_moment_along_length,label='With Ponding')
 plt.plot(results1.position_along_length,results1.bending_moment_along_length,label='No Ponding')
 plt.legend()
-plt.ylabel('Bending Moment')
+plt.xlabel('Position along length of beam (in.)')
+plt.ylabel('Bending Moment (kip-in.)')
 plt.xlim([0,L])
 
 plt.figure()
 plt.plot(resultsP.position_along_length,resultsP.shear_along_length,label='With Ponding')
 plt.plot(results1.position_along_length,results1.shear_along_length,label='No Ponding')
 plt.legend()
-plt.ylabel('Shear')
+plt.xlabel('Position along length of beam (in.)')
+plt.ylabel('Shear (kips)')
 plt.xlim([0,L])
 
 plt.figure()
 plt.plot(resultsP.position_along_length,resultsP.bending_moment_along_length/results1.bending_moment_along_length,label='Bending Moment')
 plt.plot(results1.position_along_length,resultsP.shear_along_length/results1.shear_along_length,label='Shear')
 plt.legend()
+plt.xlabel('Position along length of beam (in.)')
 plt.ylabel('Amplification Factor')
 plt.xlim([0,L])
 #plt.ylim([0,2*(1/(1-Cs))])
