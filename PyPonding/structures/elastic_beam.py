@@ -206,7 +206,10 @@ class ElasticBeam2d:
             
         elif analysis_type.lower() == 'iterativelevel':
 
-            for iStep in range(1,self.maximum_number_of_iterations+1):
+            iStep = 1
+            while True:
+                if iStep > self.maximum_number_of_iterations:
+                    raise Exception(f'Analysis did not converge in {self.maximum_number_of_iterations} iterations')
 
                 # Update ponding load cells
                 if self.include_ponding_effect:
@@ -232,6 +235,9 @@ class ElasticBeam2d:
                 ops.analyze(1)
                 ops.reactions()
             
+                # Increment step counter
+                iStep += 1
+                
             # Store Results
             (V,dVdz) = PondingLoadManager.get_volume(target_zw)
             results.water_volume = V
@@ -240,7 +246,10 @@ class ElasticBeam2d:
             
         elif analysis_type.lower() == 'iterativevolume':
 
-            for iStep in range(1,self.maximum_number_of_iterations+1):
+            iStep = 1
+            while True:
+                if iStep > self.maximum_number_of_iterations:
+                    raise Exception(f'Analysis did not converge in {self.maximum_number_of_iterations} iterations')
 
                 # Update ponding load cells
                 if self.include_ponding_effect:
@@ -275,6 +284,9 @@ class ElasticBeam2d:
                 ops.analyze(1)
                 ops.reactions()
             
+                # Increment step counter
+                iStep += 1
+                
             # Store Results
             (V,dVdz) = PondingLoadManager.get_volume(izw)
             results.water_volume = V
