@@ -34,6 +34,7 @@ resultsP = beam.run_analysis_OPS('IterativeLevel',target_zw=zw)
 VmaxP = np.amax(np.absolute(resultsP.shear_along_length))
 MmaxP = np.amax(resultsP.bending_moment_along_length)
 x_at_MmaxP = resultsP.position_along_length[np.argmax(resultsP.bending_moment_along_length)]
+TotalLoadP = resultsP.shear_along_length[0]-resultsP.shear_along_length[-1]
 
 # Run First-Order Analysis
 beam.include_ponding_effect = False
@@ -41,6 +42,7 @@ results1 = beam.run_analysis_OPS('IterativeLevel',target_zw=zw)
 Vmax1 = np.amax(np.absolute(results1.shear_along_length))
 Mmax1 = np.amax(results1.bending_moment_along_length)
 x_at_Mmax1 = results1.position_along_length[np.argmax(results1.bending_moment_along_length)]
+TotalLoad1 = results1.shear_along_length[0]-results1.shear_along_length[-1]
 
 
 # Print Results
@@ -50,6 +52,7 @@ print('Basic Amplification 1/(1-Cs) = %.3f' % (1/(1-Cs)))
 x = pi/2*Cs**0.25
 print('More Exact Amplification     = %.3f\n' % ((1/cos(x)-1/cosh(x))/x**2)) # from Silver (2010)
 print('                      with ponding           no ponding          amplification')
+print('Total Load          %9.3f kip         %9.3f kip          %9.3f' % (TotalLoadP,TotalLoad1,TotalLoadP/TotalLoad1))
 print('Max Shear           %9.3f kip         %9.3f kip          %9.3f' % (VmaxP,Vmax1,VmaxP/Vmax1))
 print('Max Moment          %9.3f kip-in      %9.3f kip-in       %9.3f' % (MmaxP,Mmax1,MmaxP/Mmax1))
 print('Pos. of Mmax      %5.1f in (%4.3f*L)    %5.1f in (%4.3f*L)\n' % (x_at_MmaxP,x_at_MmaxP/L,x_at_Mmax1,x_at_Mmax1/L))
