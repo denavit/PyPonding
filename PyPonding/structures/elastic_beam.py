@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from math import pi
 from .. import PondingLoadManager2d
 from .. import opensees as ops
@@ -327,4 +328,47 @@ class ElasticBeam2d:
             results.shear_along_length[2*i+1]          = -ele_forces[4]
             results.bending_moment_along_length[2*i+1] = ele_forces[5]   
         
+        return
+        
+    def plot_deformed(self,show_undeformed=True,axis_equal=False,zw=None):
+        
+        # Retrieve nodal coordinates and displacements
+        node_coords = dict()
+        node_disp = dict()
+        for i in range(self.num_elements+1):
+            node_coords[i] = ops.nodeCoord(i)
+            node_disp[i] = ops.nodeDisp(i)
+            
+        fig = plt.figure()
+        # Plot undeformed shape
+        if show_undeformed:
+            for i in range(self.num_elements):
+                coordi = node_coords[i]
+                coordj = node_coords[i+1]
+                xplt = [coordi[0],coordj[0]]
+                yplt = [coordi[1],coordj[1]]
+                plt.plot(xplt,yplt,'-',color='lightgrey')
+        # Plot water
+        if zw is not None:
+            x = []
+            top_water = []      
+            bot_water = []
+            for i in range(self.num_elements+1):
+                x.append(i/self.num_elements*self.L)
+                top_water.append(max(zw,node_coords[i][1]+node_disp[i][1]))
+                bot_water.append(node_coords[i][1]+node_disp[i][1])
+            plt.fill_between(x, top_water, bot_water, facecolor='blue', alpha=0.5)   
+        # Plot deformed shape
+        for i in range(self.num_elements):
+            coordi = node_coords[i]
+            coordj = node_coords[i+1]
+            dispi = node_disp[i]
+            dispj = node_disp[i+1]
+            xplt = [coordi[0]+dispi[0],coordj[0]+dispj[0]]
+            yplt = [coordi[1]+dispi[1],coordj[1]+dispj[1]]
+            plt.plot(xplt,yplt,'-',color='k')
+
+        if axis_equal:
+            plt.gca().axis('equal')
+        #plt.show()
         return

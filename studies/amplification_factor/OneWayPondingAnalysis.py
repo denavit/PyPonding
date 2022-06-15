@@ -36,6 +36,8 @@ MmaxP = np.amax(resultsP.bending_moment_along_length)
 x_at_MmaxP = resultsP.position_along_length[np.argmax(resultsP.bending_moment_along_length)]
 TotalLoadP = resultsP.shear_along_length[0]-resultsP.shear_along_length[-1]
 
+beam.plot_deformed(zw=zw)
+
 # Run First-Order Analysis
 beam.include_ponding_effect = False
 results1 = beam.run_analysis_OPS('IterativeLevel',target_zw=zw)
