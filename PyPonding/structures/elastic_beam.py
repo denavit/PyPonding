@@ -102,7 +102,9 @@ class ElasticBeam2d:
         ops.analysis("Static")
 
         # Run dead load analysis
-        ops.analyze(1)
+        res = ops.analyze(1)
+        if res < 0:
+            raise Exception(f'Dead load analysis failed')
         
         # Determine low point along beam
         zo = float('inf')
@@ -155,7 +157,9 @@ class ElasticBeam2d:
                 PondingLoadManager.commit_current_load_vector()
 
                 # Run analysis
-                ops.analyze(1)
+                res = ops.analyze(1)
+                if res < 0:
+                    raise Exception(f'Analysis step failed ({iStep = })')
                 ops.reactions()
 
                 # Store Reuslts
@@ -198,7 +202,9 @@ class ElasticBeam2d:
                 PondingLoadManager.commit_current_load_vector()
 
                 # Run analysis
-                ops.analyze(1)
+                res = ops.analyze(1)
+                if res < 0:
+                    raise Exception(f'Analysis step failed ({iStep = })')
                 ops.reactions()
 
                 # Store Reuslts
@@ -233,7 +239,9 @@ class ElasticBeam2d:
                 PondingLoadManager.commit_current_load_vector()
 
                 # Run analysis
-                ops.analyze(1)
+                res = ops.analyze(1)
+                if res < 0:
+                    raise Exception(f'Analysis step failed ({iStep = })')
                 ops.reactions()
             
                 # Increment step counter
@@ -282,7 +290,9 @@ class ElasticBeam2d:
                 PondingLoadManager.commit_current_load_vector()
 
                 # Run analysis
-                ops.analyze(1)
+                res = ops.analyze(1)
+                if res < 0:
+                    raise Exception(f'Analysis step failed ({iStep = })')
                 ops.reactions()
             
                 # Increment step counter
