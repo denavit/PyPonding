@@ -299,12 +299,18 @@ class IdealizedBay:
                     'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
                     'SNOW':self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
                     'PONDING':self.additional_load_factor_ponding})
+                total_factored_load = (self.additional_load_factor_dead*self.load_factor_dead*self.dead_load_uniform*self.primary_member_span*self.secondary_member_span + 
+                                       self.additional_load_factor_snow*self.load_factor_snow*self.snow_density*self.snow_height*self.primary_member_span*self.secondary_member_span + 
+                                       -self.additional_load_factor_ponding*ponding_load.sum()/self.alpha)
             else:
                 res.run({
                     'DEAD':self.alpha*self.load_factor_dead,
                     'SNOW':self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
-            
+                total_factored_load = (self.load_factor_dead*self.dead_load_uniform*self.primary_member_span*self.secondary_member_span + 
+                                       self.load_factor_snow*self.snow_density*self.snow_height*self.primary_member_span*self.secondary_member_span + 
+                                       -ponding_load.sum()/self.alpha)
+
             # Get reactions (load on the primary members)
             primary_member_ponding_load_T[i] = -secondary_member_model.Nodes['n00'].dofs['UY'].react(res)
             primary_member_ponding_load_B[i] = -secondary_member_model.Nodes['n%02i' % self.num_ele_secondary].dofs['UY'].react(res)
@@ -384,6 +390,7 @@ class IdealizedBay:
         results.top_primary_member_deflection     = primary_member_deflection_B   
         results.top_primary_member_ponding_load   = primary_member_ponding_load_T 
         results.top_primary_member_ponding_load   = primary_member_ponding_load_B 
+        results.total_factored_load               = total_factored_load # @todo - figure out how best to add primary member self-weight to total_factored_load
 
         x = np.zeros((2*self.num_ele_secondary,1))
         for i in range(2*self.num_ele_secondary):
@@ -695,6 +702,7 @@ class IdealizedBay:
         results.bay_total_deflection = deflection                    
         results.top_primary_member_deflection = primary_member_deflection_T   
         results.bot_primary_member_deflection = primary_member_deflection_B   
+        # @todo - add total_factored_load output (see run_static_analysis_FE)
 
         x = np.zeros((2*self.num_ele_secondary,1))
         for i in range(2*self.num_ele_secondary):
