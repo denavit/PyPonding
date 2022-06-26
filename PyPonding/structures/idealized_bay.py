@@ -181,7 +181,7 @@ class IdealizedBay:
                     sum_of_force += abs(ponding_load[i,j])
                     sum_of_diff  += abs(ponding_load_last[i,j]-ponding_load[i,j])
 
-            print('Iteration %02i, Total Force: %.5f' % (iteration,sum_of_force))
+            print('Iteration %02i, Total Fluid Load: %.5f' % (iteration,sum_of_force))
 
             if sum_of_force == 0:
                 if sum_of_diff <= self.tol and iteration > 0:
