@@ -1,5 +1,4 @@
-from PyPonding.structures import bay
-from PyPonding import FE
+from PyPonding.structures import IdealizedBay
 from math import pi, cos, cosh
 import numpy as np
 
@@ -8,122 +7,109 @@ inch    = 1.0
 kip     = 1.0
 lb      = kip/1000.0
 ft      = 12.0*inch
+in_per_ft = inch/ft
 ksi     = kip/inch**2
+plf     = lb/ft
 psf     = lb/ft**2
 pcf     = psf/ft
+kipft   = kip*ft
 
-water_level = 2*inch
 
-# Define Steel Beam Object
-myBay = bay();
 
-# Geometry
-myBay.primary_member_span         = 40*ft
-myBay.secondary_member_span       = 40*ft
-myBay.num_spaces                  = 8
+# Bay Geometry
+Lp = 40*ft
+Ls = 40*ft
+num_spaces = 8
+S  = Lp/num_spaces
 
-# Loads and load factors
-myBay.dead_load_uniform           = 10.0*psf
-myBay.dead_load_primary_member    = 0.0*lb/ft           # Self-weight of joist girder
-myBay.water_density               = 62.4*pcf   
+# Loads
+qD = 10.0*psf
+γw = 62.4*pcf   
+zw = 2*inch
 
 # Top of roof elevation
-myBay.z_TL                        = 0.0*inch
-myBay.z_TR                        = 0.0*inch
-myBay.z_BL                        = 0.0*inch
-myBay.z_BR                        = 0.0*inch
+zTL = 0.0*inch
+zTR = 0.0*inch
+zBL = 0.0*inch
+zBR = 0.0*inch
 
-# Camber
-myBay.primary_member_camber_T     = 0.0*inch
-myBay.primary_member_camber_B     = 0.0*inch
-myBay.secondary_member_camber     = 0.0*inch
+# Material properties
+E = 29000.0*ksi
 
-# Edge conditions ('mirrored', 'rigid', or '')
-myBay.edge_condition_L            = 'mirrored'
-myBay.edge_condition_R            = 'mirrored'
-myBay.edge_condition_T            = 'mirrored'
-myBay.edge_condition_B            = 'mirrored'
+# Member stiffness
+Cp = 0.1
+Cs = 0.1
+Ip = (γw*Ls*Lp**4)/(pi**4*E*Cp)
+Is = (γw*S*Ls**4)/(pi**4*E*Cs)
 
-# Material and section properties
-myBay.E                           = 29000.0*ksi
-myBay.Ap                          = 100*inch**2
-myBay.As                          = 100*inch**2
-myBay.Ip                          = 1820*inch**4
-myBay.Is                          = 182*inch**4
+# Define IdealizedBay object
+input = {
+    'primary_member_span': Lp,
+    'secondary_member_span': Ls,
+    'number_of_joist_spaces': num_spaces,
+    'dead_load_uniform': qD,
+    'dead_load_primary_member': 0*plf,
+    'water_density': γw,  
+    'snow_density': 0.0*pcf,
+    'snow_height': 0.0*inch,
+    'alpha': 1.0,
+    'load_factor_dead':    1.0,
+    'load_factor_ponding': 1.0,
+    'load_factor_snow':    1.0,
+    'z_TL': zTL,
+    'z_TR': zTR,
+    'z_BL': zBL,
+    'z_BR': zBR,
+    'secondary_member_camber': 0.000*inch,
+    'primary_member_camber_T': 0.000*inch,
+    'primary_member_camber_B': 0.000*inch,
+    'edge_condition_L': 'mirrored',
+    'edge_condition_R': 'mirrored',
+    'edge_condition_T': 'mirrored',
+    'edge_condition_B': 'mirrored',
+    'E':  E,
+    'As': 100*inch**2,
+    'Ap': 100*inch**2,
+    'Is': Is,
+    'Ip': Ip,
+    'analsis_engine': 'FE',
+}
+bay = IdealizedBay(**input)
 
-# Analysis options
-myBay.MAX_ITER                    = 50                # Maximum number of ponding analysis iterations
 
-myBay.alpha                       = 1
-myBay.load_factor_dead            = 1.0               # Dead
-myBay.load_factor_ponding         = 1.0               # Impounded Water
-myBay.load_factor_snow1           = 0.0               # Snow in Ponding Load Cell
-myBay.load_factor_snow2           = 0.0               # Snow as Simple Load
+bay.include_ponding_effect = False
+results0 = bay.Run_Analysis(zw)
+bay.include_ponding_effect = True
+resultsP = bay.Run_Analysis(zw)
 
-myBay.snow_density                = 0.0
-myBay.snow_height                 = 0.0
-
-
-
-
-# Run Ponding Analysis
-myBay.include_ponding_effect = True
-print('Running Ponding Analysis')
-myBay.Run_Analysis(water_level)
-Mmax_TP = np.amax(myBay.results_top_primary_M)
-Mmax_BP = np.amax(myBay.results_bot_primary_M)
-Mmax_J = np.zeros(myBay.num_spaces+1)
-for i in range(myBay.num_spaces+1):
-    Mmax_J[i] = np.amax(myBay.results_secondary_M[i,:])
-Vmax_TP = np.amax(myBay.results_top_primary_V)
-Vmax_BP = np.amax(myBay.results_bot_primary_V)
-Vmax_J = np.zeros(myBay.num_spaces+1)
-for i in range(myBay.num_spaces+1):
-    Vmax_J[i] = max(myBay.results_secondary_R_top[i],myBay.results_secondary_R_bot[i])
-    
-# Run First-Order Analysis
-myBay.include_ponding_effect = False
-myBay.Run_Analysis(water_level)
-Mmaxo_TP = np.amax(myBay.results_top_primary_M)
-Mmaxo_BP = np.amax(myBay.results_bot_primary_M)
-Mmaxo_J = np.zeros(myBay.num_spaces+1)
-for i in range(myBay.num_spaces+1):
-    Mmaxo_J[i] = np.amax(myBay.results_secondary_M[i,:])
-Vmaxo_TP = np.amax(myBay.results_top_primary_V)
-Vmaxo_BP = np.amax(myBay.results_bot_primary_V)
-Vmaxo_J = np.zeros(myBay.num_spaces+1)
-for i in range(myBay.num_spaces+1):
-    Vmaxo_J[i] = max(myBay.results_secondary_R_top[i],myBay.results_secondary_R_bot[i])
-    
-    
-    
-gamma = myBay.alpha*myBay.load_factor_ponding*myBay.water_density
-Cp = gamma*myBay.secondary_member_span*myBay.primary_member_span**4/(pi**4*myBay.E*myBay.Ip)
-Cs = gamma*(myBay.primary_member_span/myBay.num_spaces)*myBay.secondary_member_span**4/(pi**4*myBay.E*myBay.Is)
 AF = 1/(1-1.15*Cp-Cs)
+print('\nBasic Amplification 1/(1-1.15Cp-Cs) = %.3f' % (AF))
 
-# Print Results
-print('\nPrinting Results')
-print('Cp = %.3f' % Cp)
-print('Cs = %.3f' % Cs)
-print('Basic Amplification 1/(1-1.15Cp-Cs) = %.3f' % (AF))
-print('                                        with ponding           no ponding          amplification')
-print('Max Moment in Top Primary Member      %9.3f kip-in      %9.3f kip-in       %9.3f' % (Mmax_TP,Mmaxo_TP,Mmax_TP/Mmaxo_TP))
-print('Max Moment in Bot Primary Member      %9.3f kip-in      %9.3f kip-in       %9.3f' % (Mmax_BP,Mmaxo_BP,Mmax_BP/Mmaxo_BP))
-maxAFm = max(Mmax_TP/Mmaxo_TP,Mmax_BP/Mmaxo_BP)
-for i in range(myBay.num_spaces+1):
-    print('Max Moment in Secondary Member %2i     %9.3f kip-in      %9.3f kip-in       %9.3f' % (i+1,Mmax_J[i],Mmaxo_J[i],Mmax_J[i]/Mmaxo_J[i]))
-    maxAFm = max(maxAFm,Mmax_J[i]/Mmaxo_J[i])
-print('Max Shear in Top Primary Member       %9.3f kip         %9.3f kip          %9.3f' % (Vmax_TP,Vmaxo_TP,Vmax_TP/Vmaxo_TP))
-print('Max Shear in Bot Primary Member       %9.3f kip         %9.3f kip          %9.3f' % (Vmax_BP,Vmaxo_BP,Vmax_BP/Vmaxo_BP))
-maxAFv = max(Vmax_TP/Vmaxo_TP,Vmax_BP/Vmaxo_BP)
-for i in range(myBay.num_spaces+1):
-    print('Max Shear in Secondary Member %2i      %9.3f kip         %9.3f kin          %9.3f' % (i+1,Vmax_J[i],Vmaxo_J[i],Vmax_J[i]/Vmaxo_J[i]))
-    maxAFv = max(maxAFv,Vmax_J[i]/Vmaxo_J[i])
-    
-print('Maximum Moment Amplification = %9.3f' % (maxAFm))
-print('Maximum Shear Amplification  = %9.3f' % (maxAFv))
-print('Maximum Amplification        = %9.3f' % (max(maxAFm,maxAFv)))
+print('==== Total Load ====')
+print(f'No Ponding Effect:    {results0.total_factored_load:.3f}')
+print(f'With Ponding Effect:  {resultsP.total_factored_load:.3f}')
+print(f'Amplification Factor: {resultsP.total_factored_load/results0.total_factored_load:.3f}')
+
+print('==== Member Output ====')
+print('  Member         Max Shear      Max Moment         Max Shear      Max Moment        Shear AF         Moment AF')
+print('                  (kips)         (kip-ft)           (kips)         (kip-ft)           (---)            (---)  ')
+for i in range(bay.number_of_joist_spaces+1):
+    Vmax0 = max(results0.secondary_members_bot_reaction[i],results0.secondary_members_top_reaction[i])
+    Mmax0 = max(results0.secondary_members_moment[i,:])/12
+    VmaxP = max(resultsP.secondary_members_bot_reaction[i],resultsP.secondary_members_top_reaction[i])
+    MmaxP = max(resultsP.secondary_members_moment[i,:])/12
+    print(f'Secondary {i+1:<2d}   {Vmax0:>8.2f}         {Mmax0:>8.2f}         {VmaxP:>8.2f}         {MmaxP:>8.2f}         {VmaxP/Vmax0:>8.3f}         {MmaxP/Mmax0:>8.3f}')
+Vmax0 = max(abs(results0.top_primary_member_shear))
+Mmax0 = max(results0.top_primary_member_moment)/12
+VmaxP = max(abs(resultsP.top_primary_member_shear))
+MmaxP = max(resultsP.top_primary_member_moment)/12
+print(f'Primary Top    {Vmax0:>8.2f}         {Mmax0:>8.2f}         {VmaxP:>8.2f}         {MmaxP:>8.2f}         {VmaxP/Vmax0:>8.3f}         {MmaxP/Mmax0:>8.3f}')
+Vmax0 = max(abs(results0.bot_primary_member_shear))
+Mmax0 = max(results0.bot_primary_member_moment)/12
+VmaxP = max(abs(resultsP.bot_primary_member_shear))
+MmaxP = max(resultsP.bot_primary_member_moment)/12
+print(f'Primary Bot    {Vmax0:>8.2f}         {Mmax0:>8.2f}         {VmaxP:>8.2f}         {MmaxP:>8.2f}         {VmaxP/Vmax0:>8.3f}         {MmaxP/Mmax0:>8.3f}')
+
 
 
 
