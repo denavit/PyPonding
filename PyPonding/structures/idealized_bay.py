@@ -22,16 +22,24 @@ class IdealizedBay:
         self.secondary_member_span  = attrs['secondary_member_span']
         self.number_of_joist_spaces = attrs['number_of_joist_spaces']
 
-        # Loads and load factors
-        self.dead_load_uniform         = attrs['dead_load_uniform'] 
-        self.dead_load_primary_member  = attrs['dead_load_primary_member'] # Self-weight of joist girder
-        self.water_density             = attrs['water_density'] 
-        self.snow_density              = attrs['snow_density'] 
-        self.snow_height               = attrs['snow_height'] 
-        self.alpha                     = attrs['alpha']
-        self.load_factor_dead          = attrs['load_factor_dead']    # Dead
-        self.load_factor_ponding       = attrs['load_factor_ponding'] # Impounded Water
-        self.load_factor_snow          = attrs['load_factor_snow']    # Snow
+        # Loads on bay
+        self.dead_load_uniform  = attrs['dead_load_uniform'] 
+        self.snow_density       = attrs['snow_density'] 
+        self.snow_height        = attrs['snow_height'] 
+        self.water_density      = attrs['water_density'] 
+        
+        # Loads on primary members (force per length)
+        self.dead_load_primary_member           = attrs.get('dead_load_primary_member', 0.0)             # Acts on both primary members (for backwards compatibility)
+        self.dead_load_on_top_primary_member    = attrs.get('dead_load_on_top_primary_member', 0.0)      # Acts on top primary member only
+        self.dead_load_on_bottom_primary_member = attrs.get('dead_load_on_bottom_primary_member', 0.0)   # Acts on bottom primary member only
+        self.snow_load_on_top_primary_member    = attrs.get('snow_load_on_top_primary_member', 0.0)      # Acts on top primary member only
+        self.snow_load_on_bottom_primary_member = attrs.get('snow_load_on_bottom_primary_member', 0.0)   # Acts on bottom primary member only
+        
+        # Load factors and options
+        self.alpha               = attrs['alpha']
+        self.load_factor_dead    = attrs['load_factor_dead']    # Dead
+        self.load_factor_ponding = attrs['load_factor_ponding'] # Impounded Water
+        self.load_factor_snow    = attrs['load_factor_snow']    # Snow
         self.consider_snow_and_water_overlap = attrs.get('consider_snow_and_water_overlap', True)
 
         self.run_factored_analysis_after_ponding_analysis = attrs.get('run_factored_analysis_after_ponding_analysis', False)
@@ -234,11 +242,20 @@ class IdealizedBay:
                 primary_member_model.Nodes[n].dofs['UY'].constrained = True
                 
             # Only apply self-weight or girder, other loads will come from the reaction of the secondary members
-            P_dead = self.dead_load_primary_member*(self.primary_member_span/self.number_of_joist_spaces)
+            P_dead_T = (self.dead_load_primary_member+self.dead_load_on_top_primary_member)*(self.primary_member_span/self.number_of_joist_spaces)
+            P_dead_B = (self.dead_load_primary_member+self.dead_load_on_bottom_primary_member)*(self.primary_member_span/self.number_of_joist_spaces)
+            P_snow_T = self.snow_load_on_top_primary_member*(self.primary_member_span/self.number_of_joist_spaces)
+            P_snow_B = self.snow_load_on_bottom_primary_member*(self.primary_member_span/self.number_of_joist_spaces)
             if i == 0 or i == self.number_of_joist_spaces:
-                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD'] = -P_dead/2
+                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD_T'] = -P_dead_T/2
+                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD_B'] = -P_dead_B/2
+                primary_member_model.Nodes[n].dofs['UY'].loads['SNOW_T'] = -P_snow_T/2
+                primary_member_model.Nodes[n].dofs['UY'].loads['SNOW_B'] = -P_snow_B/2
             else:
-                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD'] = -P_dead
+                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD_T'] = -P_dead_T
+                primary_member_model.Nodes[n].dofs['UY'].loads['DEAD_B'] = -P_dead_B
+                primary_member_model.Nodes[n].dofs['UY'].loads['SNOW_T'] = -P_snow_T
+                primary_member_model.Nodes[n].dofs['UY'].loads['SNOW_B'] = -P_snow_B
                 
         # Define Elements
         for i in range(self.number_of_joist_spaces):
@@ -335,11 +352,13 @@ class IdealizedBay:
             res = FE.LinearAnalysis(primary_member_model)
             if use_additional_load_factors:
                 res.run({
-                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'DEAD_T':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'SNOW_T':self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
             else:
                 res.run({
-                    'DEAD':self.alpha*self.load_factor_dead,
+                    'DEAD_T':self.alpha*self.load_factor_dead,
+                    'SNOW_T':self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
             
             # Get member defelctions
@@ -362,11 +381,13 @@ class IdealizedBay:
             res = FE.LinearAnalysis(primary_member_model)
             if use_additional_load_factors:
                 res.run({
-                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'DEAD_B':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'SNOW_B':self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
             else:
                 res.run({
-                    'DEAD':self.alpha*self.load_factor_dead,
+                    'DEAD_B':self.alpha*self.load_factor_dead,
+                    'SNOW_B':self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
             
             # Get member defelctions
@@ -594,7 +615,7 @@ class IdealizedBay:
             # Define load
             ops.timeSeries("Constant", 1)
             ops.pattern('Plain', 1, 1)
-            self_weight = -self.alpha*self.load_factor_dead*self.dead_load_primary_member* \
+            self_weight = -self.alpha*(self.load_factor_dead*(self.dead_load_primary_member+self.dead_load_on_top_primary_member) + self.load_factor_snow*(self.snow_load_on_top_primary_member))* \
                 (self.primary_member_span/self.number_of_joist_spaces)
             for i in range(self.number_of_joist_spaces+1):
                 if self.edge_condition_T == 'mirrored':
@@ -653,7 +674,7 @@ class IdealizedBay:
             # Define load
             ops.timeSeries("Constant", 1)
             ops.pattern('Plain', 1, 1)
-            self_weight = -self.alpha*self.load_factor_dead*self.dead_load_primary_member* \
+            self_weight = -self.alpha*(self.load_factor_dead*(self.dead_load_primary_member+self.dead_load_on_bottom_primary_member) + self.load_factor_snow*(self.snow_load_on_bottom_primary_member))* \
                 (self.primary_member_span/self.number_of_joist_spaces)
             for i in range(self.number_of_joist_spaces+1):
                 if self.edge_condition_B == 'mirrored':
@@ -752,7 +773,9 @@ def run_example():
         'secondary_member_span': 45*ft,
         'number_of_joist_spaces': 5,
         'dead_load_uniform': 13.73*psf,
-        'dead_load_primary_member': 68*plf,
+        #'dead_load_primary_member': 68*plf,
+        'dead_load_on_top_primary_member': 68*plf,
+        'dead_load_on_bottom_primary_member': 68*plf,
         'water_density': 62.4*pcf,  
         'snow_density': 15.30*pcf,
         'snow_height': 0.5*0.7*(25.00*psf)/(15.30*pcf),
