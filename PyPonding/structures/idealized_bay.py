@@ -280,8 +280,6 @@ class IdealizedBay:
               
             P_dead = self.dead_load_uniform*(self.primary_member_span/self.number_of_joist_spaces)*(self.secondary_member_span/self.num_ele_secondary)
             P_snow = self.snow_density*self.snow_height*(self.primary_member_span/self.number_of_joist_spaces)*(self.secondary_member_span/self.num_ele_secondary)
-            # @todo - check this if it is mirrored
-            # @todo - check if first and last nodes should have half the load
             if i == 0 or i == self.num_ele_secondary:
                 secondary_member_model.Nodes[n].dofs['UY'].loads['DEAD'] = -P_dead/2
                 secondary_member_model.Nodes[n].dofs['UY'].loads['SNOW'] = -P_snow/2
@@ -298,9 +296,9 @@ class IdealizedBay:
         # Perform analyses on secondary members
         for i in range(self.number_of_joist_spaces+1):
             if i == 0 and self.edge_condition_L == 'rigid':
-                break
+                continue
             if i == self.number_of_joist_spaces and self.edge_condition_R == 'rigid':
-                break
+                continue
                 
             # Apply water loads to the secondary members
             for j in range(self.num_ele_secondary + 1):
@@ -309,20 +307,26 @@ class IdealizedBay:
                 else:
                     secondary_member_model.Nodes['n%02i' % j].dofs['UY'].loads['PONDING'] = ponding_load[i,j]
         
+            # Half load on left and right members if not mirrored
+            if (i == 0 and self.edge_condition_L != 'mirrored') or (i == self.number_of_joist_spaces and self.edge_condition_R != 'mirrored'):
+                edge_member_load_factor  = 0.5
+            else:
+                edge_member_load_factor  = 1.0
+                
             # Run secondary member analyses
             res = FE.LinearAnalysis(secondary_member_model)
             if use_additional_load_factors:
                 res.run({
-                    'DEAD':self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
-                    'SNOW':self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
+                    'DEAD':edge_member_load_factor*self.additional_load_factor_dead*self.alpha*self.load_factor_dead,
+                    'SNOW':edge_member_load_factor*self.additional_load_factor_snow*self.alpha*self.load_factor_snow,
                     'PONDING':self.additional_load_factor_ponding})
                 total_factored_load = (self.additional_load_factor_dead*self.load_factor_dead*self.dead_load_uniform*self.primary_member_span*self.secondary_member_span + 
                                        self.additional_load_factor_snow*self.load_factor_snow*self.snow_density*self.snow_height*self.primary_member_span*self.secondary_member_span + 
                                        -self.additional_load_factor_ponding*ponding_load.sum()/self.alpha)
             else:
                 res.run({
-                    'DEAD':self.alpha*self.load_factor_dead,
-                    'SNOW':self.alpha*self.load_factor_snow,
+                    'DEAD':edge_member_load_factor*self.alpha*self.load_factor_dead,
+                    'SNOW':edge_member_load_factor*self.alpha*self.load_factor_snow,
                     'PONDING':1.0})
                 total_factored_load = (self.load_factor_dead*self.dead_load_uniform*self.primary_member_span*self.secondary_member_span + 
                                        self.load_factor_snow*self.snow_density*self.snow_height*self.primary_member_span*self.secondary_member_span + 
@@ -424,9 +428,9 @@ class IdealizedBay:
         results.secondary_members_bot_reaction = np.zeros(self.number_of_joist_spaces+1)
         for i in range(self.number_of_joist_spaces+1):
             if i == 0 and self.edge_condition_L == 'rigid':
-                break
+                continue
             if i == self.number_of_joist_spaces and self.edge_condition_R == 'rigid':
-                break            
+                continue            
             for j in range(self.num_ele_secondary):
                 ele_force = secondary_member_model.Elements['e%02i'%j].force(secondary_member_results[i])/self.alpha
                 results.secondary_members_moment[i,2*j+0] = -ele_force.item(2)
@@ -485,9 +489,9 @@ class IdealizedBay:
         # Perform analyses on secondary members
         for i in range(self.number_of_joist_spaces+1):
             if i == 0 and self.edge_condition_L == 'rigid':
-                break
+                continue
             if i == self.number_of_joist_spaces and self.edge_condition_R == 'rigid':
-                break
+                continue
                 
             # Create OpenSees model
             ops.wipe()
