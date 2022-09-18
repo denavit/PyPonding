@@ -1,6 +1,8 @@
 from PyPonding.structures import IdealizedBay
+import matplotlib.pyplot as plt
 from math import pi, cos, cosh
 import numpy as np
+import os
 
 # Define units
 inch    = 1.0
@@ -277,14 +279,130 @@ def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
   
     return amplification_factors
 
+def run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD):
+    
+    color_list = ['tab:blue','tab:orange','tab:green','tab:red']
+    
+    # Create folder to save figures to if it doesn't exist
+    try:
+        os.mkdir(f'Case {case} Plots')
+    except FileExistsError:
+        pass
+    
+    # Plot types/titles, end if invalid case
+    if case == 'A':
+        titles = ["Top Primary Member", "Secondary Members"]
+    elif case == 'B':
+        titles = ["Top Primary Member", "Bottom Primary Member", "Secondary Members"]
+    elif case == 'C':
+        titles = ["Primary Members", "Secondary Member 2"]
+    elif case == 'D':
+        titles = ["Primary Members", "Secondary Member 1"]
+    else:
+        return print(f"Invalid Case: '{case}'") 
+    
+    # Get percentage completion
+    count = 0
+    total = len(Cs_list) * len(Cp_list) * len(zw_over_zj_list)
+    
+    # Loop Cs values
+    for Cs in Cs_list:
+                 
+        # Initalize Bp list and clear between lines
+        Bp_results = dict()
+     
+        # Run analyses for each Cp value
+        for iCp, Cp in enumerate(Cp_list):
+            
+            # Inititalize results data structure
+            Bp_results[Cp] = dict()
+            for title in titles:
+                Bp_results[Cp][title] = []
+
+            # Run analyises
+            for zw_over_zj in zw_over_zj_list:
+                
+                # Get percentage completion
+                count += 1
+                completion_status = round(100 * (count/total), 1)
+                
+                print(f'\n==== Analysis {completion_status}% complete. ==== \n==== Analysis for Case = {case}, {Cs = }, {Cp = }, {zw_over_zj = } ====\n')
+                
+                amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD)       
+                                                                      
+                # Save needed results
+                for title in titles:
+                    if title == "Primary Members":
+                        Bp_max = max(amplification_factors['top'], amplification_factors['bottom'])
+                    elif title == "Top Primary Member":
+                        Bp_max = amplification_factors['top']
+                    elif title == "Bottom Primary Member":
+                        Bp_max = amplification_factors['bottom']
+                    elif title == "Secondary Members":
+                        Bp_max = max(amplification_factors['secondary'])
+                    elif title == "Secondary Member 1":
+                        Bp_max = amplification_factors['secondary'][0]
+                    elif title == "Secondary Member 2":
+                        Bp_max = amplification_factors['secondary'][1]
+                    else:
+                        return print(f"Unknown title: '{title}'") 
+                    
+                    Bp_results[Cp][title].append(Bp_max)
+                    
+        # Make plots
+        for title in titles:
+            
+            #figure
+            loop_fig = plt.figure(figsize=(3.25,2.75), dpi = 300) 
+            
+            #plot for each title/type of plot
+            for iCp, Cp in enumerate(Cp_list):
+
+                #plot data
+                loop_plot = plt.plot(zw_over_zj_list, Bp_results[Cp][title], label=f'$C_p$ = {Cp}', color=color_list[iCp])  
+                
+                #equation line based on case
+                if case == 'A':
+                    ideal_Bp = 1/(1-0.25*Cp-1.2*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                elif case == 'B':
+                    ideal_Bp = 1/(1-0.9*Cp-1.2*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,0.9],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                elif case == 'C':
+                    ideal_Bp = 1/(1-0.6*Cp-1.2*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                elif case == 'D':
+                    ideal_Bp = 1/(1-0.6*Cp-1.2*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+    
+            #formatting
+            plt.title(f'Case {case} --- $C_s$ = {Cs} --- {title}', fontsize = 8)
+            plt.xlabel('$z_w/z_j$', fontsize = 8)
+            plt.xticks(fontsize = 8)
+            plt.ylabel('Amplification Factor, $B_p$', fontsize = 8)
+            plt.yticks(fontsize = 8)
+            plt.legend(fontsize = 8)
+        
+            #save to folder
+            plt.savefig(f'Case {case} Plots/Case_{case}_Cs_{Cs}_{title[0]}_Plot.png', bbox_inches = 'tight')
+    
     
 if __name__ == "__main__":
-    case = 'C'
-    Cp = 0.3
-    Cs = 0.3
+    case = 'A'
     roof_slope = 0.5*in_per_ft
-    zw_over_zj = 0.5
     qD = 0.0*psf
-    amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD)
-    print(amplification_factors)
+
+    # Run Single Analysis
+    #Cp = 0.3
+    #Cs = 0.3
+    #zw_over_zj = 0.5
+    #amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD)
     
+    # Run Analysis Loop
+    #Cs_list = [0.001, 0.1, 0.2, 0.3]
+    #Cp_list = [0.001, 0.1, 0.2, 0.3]
+    #zw_over_zj_list = [0.001,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90]  
+    Cs_list = [0.2, 0.3]
+    Cp_list = [0.3, 0.2]
+    zw_over_zj_list = [0.80,0.90]
+    run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD)
