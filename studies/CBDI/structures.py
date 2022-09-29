@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import openseespy.opensees as ops
 import time
 from math import atan2,pi,pow,sqrt,ceil
 from mpl_toolkits.mplot3d import Axes3D
 from PyPonding import PondingLoadManager2d,PondingLoadManager3d
+from PyPonding import opensees as ops
 
 def camber(xi,L,c):
     if c == 0:
@@ -27,7 +27,7 @@ class AnalysisResults:
             print(f"Adding {toc - tic:0.4f} seconds to total analysis run time.")
 
     def print_total_analysis_time(self):
-        print(f"Total analysis time: {self.total_analysis_time:0.4f} seconds")
+        print(f"Total time for ops.analyze: {self.total_analysis_time:0.4f} seconds")
 
 class ExampleStructure:
 
@@ -1508,6 +1508,8 @@ class ExampleRoof(ExampleStructure):
                 ops.reactions()
 
             # Store Reuslts
+            (iV,idVdz) = PondingLoadManager.get_volume(target_zw)
+            results.water_volume = iV
             results.water_level  = target_zw
             results.col_react_B2 = self.ColumnReaction('B2')
             
