@@ -5,19 +5,28 @@ import numpy as np
 import os
 
 # Define units
-inch    = 1.0
-kip     = 1.0
-lb      = kip/1000.0
-ft      = 12.0*inch
+inch      = 1.0
+kip       = 1.0
+lb        = kip/1000.0
+ft        = 12.0*inch
 in_per_ft = inch/ft
-ksi     = kip/inch**2
-plf     = lb/ft
-psf     = lb/ft**2
-pcf     = psf/ft
-kipft   = kip*ft
+ksi       = kip/inch**2
+plf       = lb/ft
+psf       = lb/ft**2
+pcf       = psf/ft
+kipft     = kip*ft
 
+# Define members to investigate for each case
+titles = dict()
+titles['Flat']      = ["Primary Members", "Secondary Members", "Total Load"]
+titles['A']          = ["Top Primary Member", "Secondary Members"]
+titles['B']          = ["Top Primary Member", "Bottom Primary Member", "Secondary Members"]
+titles['C']          = ["Primary Members", "Secondary Member 2"]
+titles['D']          = ["Primary Members", "Secondary Member 1"]
+titles['E']          = ["Top Primary Member", "Bottom Primary Member", "Secondary Member 1"]
+titles['F']          = ["Bottom Primary Member", "Secondary Member 2"]
 
-def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
+def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zh,qD):
 
     # Bay Geometry
     Lp = 40*ft
@@ -27,7 +36,6 @@ def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
 
     # Loads
     γw = 62.4*pcf
-    set_primary_member_load_zero = False
 
     # Material properties
     E = 29000.0*ksi
@@ -35,133 +43,114 @@ def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
     # Member stiffness
     Ip = (γw*Ls*Lp**4)/(pi**4*E*Cp)
     Is = (γw*S*Ls**4)/(pi**4*E*Cs)
-
-    if case == 'A':
+    
+    if case == 'Flat':
         
-        # Roof Slope
-        zj = roof_slope*Lp
-        zw = zw_over_zj*zj
+        zw = zw_over_zh # Special case without slope 
         
-        # Primary Member Load
-        wD_T = ((384*E*Ip)/(5*360*Lp**3))*plf  
-        wD_B = 0
-        
-        z_TL = roof_slope*Ls
-        z_TR = roof_slope*Ls
+        z_TL = 0.0*inch
+        z_TR = 0.0*inch
         z_BL = 0.0*inch
         z_BR = 0.0*inch
         
         edge_condition_L = 'mirrored'
         edge_condition_R = 'mirrored'
-        edge_condition_T = 'none'
+        edge_condition_T = 'mirrored'
+        edge_condition_B = 'mirrored'
+
+        
+    elif case == 'A':
+        
+        zh = roof_slope*Lp
+        zw = zw_over_zh*zh
+        
+        z_TL = zh
+        z_TR = zh
+        z_BL = 0.0*inch
+        z_BR = 0.0*inch
+        
+        edge_condition_L = 'mirrored'
+        edge_condition_R = 'mirrored'
+        edge_condition_T = 'mirrored'
         edge_condition_B = 'rigid'
         
     elif case == 'B':
         
-        # Roof Slope
-        zj = roof_slope*Lp
-        zw = zw_over_zj*zj
+        zh = roof_slope*Lp
+        zw = zw_over_zh*zh
         
-        # Primary Member Load
-        wD_T = ((384*E*Ip)/(5*360*Lp**3))*plf   
-        wD_B = 0
-        
-        z_TL = roof_slope*Ls
-        z_TR = roof_slope*Ls
-        z_BL = 0.0*inch
-        z_BR = 0.0*inch
+        z_TL = 0.0*inch
+        z_TR = 0.0*inch
+        z_BL = zh
+        z_BR = zh
         
         edge_condition_L = 'mirrored'
         edge_condition_R = 'mirrored'
-        edge_condition_T = 'none'
+        edge_condition_T = 'mirrored'
         edge_condition_B = 'mirrored'
         
     elif case == 'C':
         
-        # Roof Slope
-        zj = roof_slope*Ls
-        zw = zw_over_zj*zj
-        
-        # Primary Member Load
-        wD_T = 0
-        wD_B = 0
+        zh = roof_slope*Ls
+        zw = zw_over_zh*zh
         
         z_TL = 0.0*inch
-        z_TR = roof_slope*Lp
+        z_TR = zh
         z_BL = 0.0*inch
-        z_BR = roof_slope*Lp
+        z_BR = zh
         
         edge_condition_L = 'rigid'
-        edge_condition_R = 'none'
+        edge_condition_R = 'mirrored'
         edge_condition_T = 'mirrored'
         edge_condition_B = 'mirrored'
         
     elif case == 'D':
         
-        # Roof Slope
-        zj = roof_slope*Ls
-        zw = zw_over_zj*zj
-        
-        # Primary Member Load
-        wD_T = 0
-        wD_B = 0
+        zh = roof_slope*Ls
+        zw = zw_over_zh*zh
         
         z_TL = 0.0*inch
-        z_TR = roof_slope*Lp
+        z_TR = zh
         z_BL = 0.0*inch
-        z_BR = roof_slope*Lp
+        z_BR = zh
         
         edge_condition_L = 'mirrored'
-        edge_condition_R = 'none'
+        edge_condition_R = 'mirrored'
         edge_condition_T = 'mirrored'
         edge_condition_B = 'mirrored'
         
     elif case == 'E':
         
-        # Roof Slope
-        zj = roof_slope*Lp
-        zw = zw_over_zj*zj
-        
-        # Primary Member Load
-        wD_T = 0
-        wD_B = 0
+        zh = roof_slope*Lp
+        zw = zw_over_zh*zh
         
         z_TL = 0.0*inch
-        z_TR = roof_slope*Ls
-        z_BL = 0.0*inch
-        z_BR = 0.0*inch
+        z_TR = zh
+        z_BL = zh
+        z_BR = zh
         
-        edge_condition_L = 'rigid'
+        edge_condition_L = 'mirrored'
         edge_condition_R = 'mirrored'
         edge_condition_T = 'mirrored'
-        edge_condition_B = 'rigid'
+        edge_condition_B = 'mirrored'
         
     elif case == 'F':
         
-        # Roof Slope
-        zj = roof_slope*Lp
-        zw = zw_over_zj*zj
+        zh = roof_slope*Lp
+        zw = zw_over_zh*zh
         
-        # Primary Member Load
-        wD_T = 0
-        wD_B = 0
-        
-        z_TL = roof_slope*Ls
+        z_TL = 0.0*inch
         z_TR = 0.0*inch
-        z_BL = roof_slope*Ls
-        z_BR = roof_slope*Ls
+        z_BL = 0.0*inch
+        z_BR = zh
         
-        edge_condition_L = 'none'
+        edge_condition_L = 'rigid'
         edge_condition_R = 'mirrored'
-        edge_condition_T = 'mirrored'
-        edge_condition_B = 'none'
+        edge_condition_T = 'rigid'
+        edge_condition_B = 'mirrored'
         
     else:
         raise ValueError(f'Unknown case {case}')
-
-    if set_primary_member_load_zero == True:
-        wD_T = 0
-        wD_B = 0
 
     # Define IdealizedBay object
     bay_input = {
@@ -169,8 +158,8 @@ def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
         'secondary_member_span': Ls,
         'number_of_joist_spaces': num_spaces,
         'dead_load_uniform': qD,
-        'dead_load_on_top_primary_member': wD_T,
-        'dead_load_on_bottom_primary_member': wD_B,
+        'dead_load_on_top_primary_member': 0.0*plf,
+        'dead_load_on_bottom_primary_member': 0.0*plf,
         'water_density': γw,  
         'snow_density': 0.0*pcf,
         'snow_height': 0.0*inch,
@@ -279,59 +268,42 @@ def run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD):
   
     return amplification_factors
 
-def run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD):
-    
-    color_list = ['tab:blue','tab:orange','tab:green','tab:red']
-    
-    # Create folder to save figures to if it doesn't exist
-    try:
-        os.mkdir(f'Case {case} Plots')
-    except FileExistsError:
-        pass
-    
-    # Plot types/titles, end if invalid case
-    if case == 'A':
-        titles = ["Top Primary Member", "Secondary Members"]
-    elif case == 'B':
-        titles = ["Top Primary Member", "Bottom Primary Member", "Secondary Members"]
-    elif case == 'C':
-        titles = ["Primary Members", "Secondary Member 2"]
-    elif case == 'D':
-        titles = ["Primary Members", "Secondary Member 1"]
-    else:
-        return print(f"Invalid Case: '{case}'") 
+def run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zh_list,qD,isplotting):
     
     # Get percentage completion
     count = 0
-    total = len(Cs_list) * len(Cp_list) * len(zw_over_zj_list)
+    total = len(Cs_list) * len(Cp_list) * len(zw_over_zh_list)
+    
+    # Initalize Bp list
+    Bp_results = dict()
     
     # Loop Cs values
     for Cs in Cs_list:
                  
-        # Initalize Bp list and clear between lines
-        Bp_results = dict()
+        # Initalize Bp list
+        Bp_results[Cs] = dict()
      
         # Run analyses for each Cp value
         for iCp, Cp in enumerate(Cp_list):
             
             # Inititalize results data structure
-            Bp_results[Cp] = dict()
-            for title in titles:
-                Bp_results[Cp][title] = []
+            Bp_results[Cs][Cp] = dict()
+            for title in titles[case]:
+                Bp_results[Cs][Cp][title] = []
 
             # Run analyises
-            for zw_over_zj in zw_over_zj_list:
+            for zw_over_zh in zw_over_zh_list:
                 
                 # Get percentage completion
                 count += 1
                 completion_status = round(100 * (count/total), 1)
                 
-                print(f'\n==== Analysis {completion_status}% complete. ==== \n==== Analysis for Case = {case}, {Cs = }, {Cp = }, {zw_over_zj = } ====\n')
+                print(f'\n==== Analysis {completion_status}% complete. ==== \n==== Analysis for Case = {case}, {Cs = }, {Cp = }, {zw_over_zh = } ====\n')
                 
-                amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD)       
+                amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zh,qD)       
                                                                       
                 # Save needed results
-                for title in titles:
+                for title in titles[case]:
                     if title == "Primary Members":
                         Bp_max = max(amplification_factors['top'], amplification_factors['bottom'])
                     elif title == "Top Primary Member":
@@ -344,40 +316,135 @@ def run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD):
                         Bp_max = amplification_factors['secondary'][0]
                     elif title == "Secondary Member 2":
                         Bp_max = amplification_factors['secondary'][1]
+                    elif title == "Total Load":
+                        Bp_max = amplification_factors['total_load']
                     else:
                         return print(f"Unknown title: '{title}'") 
                     
-                    Bp_results[Cp][title].append(Bp_max)
-                    
+                    Bp_results[Cs][Cp][title].append(Bp_max)       
+            
+    if isplotting:    
+        two_way_plot(case, Bp_results, Cs_list, Cp_list) 
+                
+    return Bp_results
+
+def equation_generator(case,Bp_results,Cs_list,Cp_list,Cs_coefs=None,Cp_coefs=None):
+    
+    if Cs_coefs is None:
+        # Set to default value
+        Cs_coefs = [0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,
+                    0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90,0.95,1.00,
+                    1.05,1.10,1.15,1.20,1.25,1.30,1.35,1.40,1.45,1.50,
+                    1.55,1.60,1.65,1.70,1.75,1.80,1.85,1.90,1.95,2.00]
+    
+    if Cp_coefs is None:
+        # Set to default value
+        Cp_coefs = [0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,
+                    0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90,0.95,1.00,
+                    1.05,1.10,1.15,1.20,1.25,1.30,1.35,1.40,1.45,1.50,
+                    1.55,1.60,1.65,1.70,1.75,1.80,1.85,1.90,1.95,2.00]
+        
+    # initialize dictionary of coefficients
+    ideal_coefs = dict()
+    
+    # find equation for each member category
+    for title in titles[case]:
+        
+        ideal_coefs[title] = dict()  
+        
+        error_sum = float('inf') # inf so that first error automatically replaces it    
+        for Cs_coef in Cs_coefs:
+            for Cp_coef in Cp_coefs:
+                                   
+                # Compute error for this combination of coefs
+                test_error_sum = 0
+                for Cs in Cs_list:                    
+                    for Cp in Cp_list:
+                        Bp_ref = max(Bp_results[Cs][Cp][title]) # Takes the max amplification
+                        
+                        if (1-Cp_coef*Cp-Cs_coef*Cs) <= 0:
+                            error = float('inf')
+                        else:
+                            M = 1
+                            if Bp_ref-(1/(1-Cp_coef*Cp-Cs_coef*Cs)) > 0:
+                                M = 5 # Penalty for underestimating the amplification factor
+                            error = M*(Bp_ref-(1/(1-Cp_coef*Cp-Cs_coef*Cs)))**2
+                        
+                        test_error_sum += error
+                        
+                # Set this combination of coefs if it gives the lowest error
+                if test_error_sum < error_sum:
+                    ideal_coefs[title]['Cp_coef'] = Cp_coef
+                    ideal_coefs[title]['Cs_coef'] = Cs_coef
+                    error_sum = test_error_sum
+    
+    return ideal_coefs
+
+def two_way_plot(case, Bp_results, Cs_list, Cp_list):
+    
+    color_list = ['tab:blue','tab:orange','tab:green','tab:red']
+    
+    # Create folder to save figures to if it doesn't exist
+    try:
+        os.mkdir(f'Case {case} Plots')
+    except FileExistsError:
+        pass
+    
+    for Cs in Cs_list:
+    
         # Make plots
-        for title in titles:
+        for title in titles[case]:
             
             #figure
             loop_fig = plt.figure(figsize=(3.25,2.75), dpi = 300) 
             
             #plot for each title/type of plot
             for iCp, Cp in enumerate(Cp_list):
-
+                
                 #plot data
-                loop_plot = plt.plot(zw_over_zj_list, Bp_results[Cp][title], label=f'$C_p$ = {Cp}', color=color_list[iCp])  
+                loop_plot = plt.plot(zw_over_zh_list, Bp_results[Cs][Cp][title], label=f'$C_p$ = {Cp}', color=color_list[iCp])  
                 
                 #equation line based on case
-                if case == 'A':
-                    ideal_Bp = 1/(1-0.25*Cp-1.2*Cs)
-                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                if case == 'Flat':
+                    if title == 'Primary Members':
+                        ideal_Bp = 1/(1-1.05*Cp-0.85*Cs)
+                        active_Bp_equation_line2 = plt.plot([0.5,1.5],[ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    elif title == 'Secondary Members':
+                        ideal_Bp = 1/(1-1.15*Cp-1.0*Cs)
+                        active_Bp_equation_line2 = plt.plot([0.5,1.5],[ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    else: 
+                        ideal_Bp = 1/(1-0.85*Cp-0.85*Cs)
+                        active_Bp_equation_line2 = plt.plot([0.0,1.5],[ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                elif case == 'A':
+                    ideal_Bp = 1/(1-0.65*Cp-1.15*Cs)
+                    active_Bp_equation_line2 = plt.plot([0.0,0.2,0.8,1.5],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    primary_basic_Bp = 1/(1-1.05*Cp-0.85*Cs)
+                    active_Bp_equation_line = plt.plot([1.2,1.5],[ideal_Bp,ideal_Bp],':', color=color_list[iCp])
                 elif case == 'B':
-                    ideal_Bp = 1/(1-0.9*Cp-1.2*Cs)
-                    active_Bp_equation_line = plt.plot([0.0,0.8,0.9],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    ideal_Bp = 1/(1-1.2*Cp-1.1*Cs)
+                    active_Bp_equation_line2 = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    primary_basic_Bp = 1/(1-1.05*Cp-0.85*Cs)
+                    active_Bp_equation_line = plt.plot([1.2,1.5],[ideal_Bp,ideal_Bp],':', color=color_list[iCp])
                 elif case == 'C':
-                    ideal_Bp = 1/(1-0.6*Cp-1.2*Cs)
-                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    ideal_Bp = 1/(1-1.0*Cp-0.85*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
                 elif case == 'D':
-                    ideal_Bp = 1/(1-0.6*Cp-1.2*Cs)
-                    active_Bp_equation_line = plt.plot([0.0,0.2,0.8,0.9],[1,1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    ideal_Bp = 1/(1-1.0*Cp-0.9*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                elif case == 'E':
+                    ideal_Bp = 1/(1-1.15*Cp-1.1*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    primary_basic_Bp = 1/(1-1.05*Cp-0.85*Cs)
+                    active_Bp_equation_line = plt.plot([1.2,1.5],[ideal_Bp,ideal_Bp],':', color=color_list[iCp])
+                elif case == 'F':
+                    ideal_Bp = 1/(1-0.65*Cp-1.0*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],'--', color=color_list[iCp])
+                    ideal_Bp = 1/(1-0.65*Cp-0.9*Cs)
+                    active_Bp_equation_line = plt.plot([0.0,0.8,1.5],[1,ideal_Bp,ideal_Bp],':', color=color_list[iCp])
     
             #formatting
             plt.title(f'Case {case} --- $C_s$ = {Cs} --- {title}', fontsize = 8)
-            plt.xlabel('$z_w/z_j$', fontsize = 8)
+            plt.xlabel('$z_w/z_h$', fontsize = 8)
             plt.xticks(fontsize = 8)
             plt.ylabel('Amplification Factor, $B_p$', fontsize = 8)
             plt.yticks(fontsize = 8)
@@ -385,24 +452,29 @@ def run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD):
         
             #save to folder
             plt.savefig(f'Case {case} Plots/Case_{case}_Cs_{Cs}_{title[0]}_Plot.png', bbox_inches = 'tight')
-    
-    
+
+
+
 if __name__ == "__main__":
-    case = 'A'
+    case = 'Flat'
     roof_slope = 0.5*in_per_ft
     qD = 0.0*psf
 
     # Run Single Analysis
     #Cp = 0.3
     #Cs = 0.3
-    #zw_over_zj = 0.5
-    #amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zj,qD)
+    #zw_over_zh = 0.5
+    #amplification_factors = run_single_analysis(case,Cp,Cs,roof_slope,zw_over_zh,qD)
     
     # Run Analysis Loop
-    #Cs_list = [0.001, 0.1, 0.2, 0.3]
-    #Cp_list = [0.001, 0.1, 0.2, 0.3]
-    #zw_over_zj_list = [0.001,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90]  
-    Cs_list = [0.2, 0.3]
-    Cp_list = [0.3, 0.2]
-    zw_over_zj_list = [0.80,0.90]
-    run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zj_list,qD)
+    Cs_list = [0.001, 0.1, 0.2, 0.3]
+    Cp_list = [0.001, 0.1, 0.2, 0.3]
+    zw_over_zh_list = [0.001,0.05,0.10,0.15,0.20,0.25,0.30,0.35,0.40,0.45,0.50,0.55,0.60,0.65,0.70,0.75,0.80,0.85,0.90,1.00,1.05,1.10,1.15,1.20,1.25,1.30,1.35,1.40,1.45,1.50]  
+    #zw_over_zh_list = [0.5, 1.5]
+
+
+    #Bp_results = run_analysis_loop(case,Cp_list,Cs_list,roof_slope,zw_over_zh_list,qD,False)
+    #ideal_coefs = equation_generator(case,Bp_results,Cs_list,Cp_list)
+    #print(ideal_coefs)
+    #two_way_plot(case, Bp_results, Cs_list, Cp_list)
+    
