@@ -8,7 +8,7 @@ from libdenavit import camber
 
 class ElasticBeam2d:
 
-    def __init__(self,L,S,E,I,gamma,A=1000.0,zi=0.0,zj=0.0,c=0.0,qD=0.0):
+    def __init__(self,L,S,E,I,gamma,A=1000.0,zi=0.0,zj=0.0,c=0.0,qD=0.0,kzi=None,kzj=None):
         self.L = L          # Beam Length (span)
         self.S = S          # Tributary width
         self.E = E          # Elastic modulus
@@ -19,7 +19,9 @@ class ElasticBeam2d:
         self.zj = zj        # Elevation of j-end (right)
         self.c = c          # Camber
         self.qD = qD        # Dead load (force per unit area)
-                
+        self.kzi = kzi      # Vertical support stiffness at i-end (left)
+        self.kzj = kzj      # Vertical support stiffness at j-end (right)
+
         # General Analysis Options
         self.include_ponding_effect = True
         self.num_elements = 20
@@ -77,8 +79,26 @@ class ElasticBeam2d:
             iy = self.zi+(self.zj-self.zi)*x_over_L + camber(ix,self.L,self.c)
             ops.node(i,ix,iy)
 
-        ops.fix(0,1,1,0)
-        ops.fix(self.num_elements,0,1,0)
+        # Define i-end boundary condition
+        if self.kzi is None:
+            ops.fix(0,1,1,0)
+        else:
+            ops.fix(0,1,0,0)
+            ind = self.num_elements+1
+            ops.node(ind,0.0,self.zi)
+            ops.fix(ind,1,1,1)
+            ops.uniaxialMaterial('Elastic', ind, self.kzi)
+            ops.element('zeroLength', ind, 0, ind, '-mat', ind, '-dir', 2)
+
+        # Define j-end boundary condition
+        if self.kzj is None:
+            ops.fix(self.num_elements,0,1,0)
+        else:
+            ind = self.num_elements+2
+            ops.node(ind,self.L,self.zj)
+            ops.fix(ind,1,1,1)
+            ops.uniaxialMaterial('Elastic', ind, self.kzj)
+            ops.element('zeroLength', ind, self.num_elements, ind, '-mat', ind, '-dir', 2)
 
         # Define elements
         ops.geomTransf(self.OPS_geom_transf_type,1)
