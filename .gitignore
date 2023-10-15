@@ -8,3 +8,4 @@ __pycache__/
 *.vtu
 *.DS_Store
 build/
+**/dist
